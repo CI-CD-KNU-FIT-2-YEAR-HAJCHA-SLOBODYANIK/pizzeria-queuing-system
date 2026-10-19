@@ -1,0 +1,82 @@
+# ==========================================
+# Visual Studio / C++ IDE Artifacts
+# ==========================================
+.vs/
+*.suo
+*.wsuo
+*.user
+*.userosv
+*.sln.docstates
+*.vcxproj.user
+
+# Visual Studio Database & Workspace Cache
+*.VC.db
+*.VC.db-shm
+*.VC.db-wal
+*.VC.opendb
+*.ipch
+*.sqlite
+slnx.sqlite
+DocumentLayout*.json
+ProjectSettings.json
+VSWorkspaceState.json
+
+# ==========================================
+# C++ Build & Output Files
+# ==========================================
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.obj
+*.o
+*.pch
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.dt.d.json
+*.dt.module.json
+*.dt.module.json.c*
+
+# ==========================================
+# Python Artifacts
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Testing & Tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.ipynb_checkpoints/
+
+# ==========================================
+# OS / Miscellaneous
+# ==========================================
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
