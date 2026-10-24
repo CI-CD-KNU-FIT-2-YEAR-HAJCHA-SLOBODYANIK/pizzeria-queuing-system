@@ -139,9 +139,11 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="simulation_engine.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="logger.hpp" />
     <ClInclude Include="structures.hpp" />
     <ClInclude Include="utils.hpp" />
   </ItemGroup>
