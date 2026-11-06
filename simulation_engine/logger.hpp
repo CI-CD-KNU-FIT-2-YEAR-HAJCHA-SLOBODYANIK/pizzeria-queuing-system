@@ -1,8 +1,10 @@
 #pragma once
 
+#include <iosfwd>
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <iosfwd>
 #include "structures.hpp"
 
 // уровни проблем, фиксируемых движком симуляции
@@ -31,6 +33,7 @@ struct TaskResult {
     int chef_prep_sec = 0;  // время приготовления поваром ДО печи
     int wait_before_oven_sec = 0;  // время ожидания свободной печи
     int oven_bake_sec = 0;  // время выпекания в ПЕЧИ
+    int wait_for_customer_sec = 0;  // Время ожидания готовой пиццы до выдачи заказа на доставку
 
     Resources resources_g;  // расход продуктов в граммах
 
@@ -177,10 +180,13 @@ public:
 
     // технические метрики
     void log_issue(const LogNotification& notification);  // запись сбоя, некорректных данных или предупреждения движка
-    void log_issue(int thread_id, int timestamp_sec, IssueSeverity severity, const std::string& code, const std::string& message, const std::string& recommendation = "");  // прямая запись проблемы без явного создания структуры
+    void log_issue(int thread_id, int timestamp_sec, IssueSeverity severity, const std::string& code, const std::string& message, const std::string& recommendation = "");  // прямая запись проблемы без явного создания структуры. код в смысле код ошибки блять
 
     // аналитические метрики
     void log_oven_event(const OvenEvent& event);  // запись физического переключения или обновления таймера печи
     void log_order(const OrderResult& result);  // запись финального результата обработки заказа
     void finalize_summary(const RunSummary& run_summary);  // сохранение итогового аналитического отчета симуляции
+
+    // Записывает данные логгера одним JSON-объектом без копирования всей истории.
+    void write_json(std::ostream& out, bool include_oven_events = true) const;
 };

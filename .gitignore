@@ -1,3 +1,4 @@
+
 # ==========================================
 # Visual Studio / C++ IDE Artifacts
 # ==========================================
@@ -15,6 +16,9 @@
 *.VC.db-wal
 *.VC.opendb
 *.ipch
+*.VC.db*
+*.opensdf
+*.sdf
 *.sqlite
 slnx.sqlite
 DocumentLayout*.json
@@ -31,6 +35,14 @@ x86/
 [Bb]in/
 [Oo]bj/
 build/
+cmake-build-*/
+out/build/
+out/install/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
 *.exe
 *.dll
 *.so
@@ -44,9 +56,19 @@ build/
 *.ilk
 *.idb
 *.exp
+*.tlog
+*.lastbuildstate
 *.dt.d.json
 *.dt.module.json
 *.dt.module.json.c*
+
+# ==========================================
+# vcpkg
+# ==========================================
+vcpkg_installed/
+.vcpkg-root/
+
+# Keep vcpkg.json and vcpkg-configuration.json tracked
 
 # ==========================================
 # Python Artifacts
@@ -54,7 +76,6 @@ build/
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 
 # Environments
 .venv/
@@ -69,14 +90,64 @@ venv.bak/
 .mypy_cache/
 .ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 *.egg-info/
 .ipynb_checkpoints/
+
+# ==========================================
+# Simulation Input Data
+# ==========================================
+
+# Generated order datasets
+/data/orders/generated/
+/data/orders/temp/
+
+# Temporary or generated manifests
+/config/generated/
+/config/temp/
+
+# Locally overridden configuration
+/config/local/
+/config/*.local.json
+
+# ==========================================
+# Simulation Output Data
+# ==========================================
+
+# Generated reports and intermediate files
+/output/
+/outputs/
+/results/generated/
+/results/temp/
+
+# Temporary simulation data
+*.json.tmp
+*.jsonl.tmp
+*.partial
+*.part
+
+# Keep reference reports in results/reference/
+# Keep input fixtures in tests/ and examples/
 
 # ==========================================
 # OS / Miscellaneous
 # ==========================================
 .DS_Store
 Thumbs.db
+Desktop.ini
+
 *.tmp
+*.bak
 *.log
+
+# ==========================================
+# Explicitly Tracked Project Data
+# ==========================================
+
+# Do not ignore recipe and topping tables.
+# Their CSV/TSV/JSON files remain trackable.
+
+# Do not globally ignore *.json or *.csv.
+# Configurations, manifests, fixtures and
+# dependency manifests must remain trackable.

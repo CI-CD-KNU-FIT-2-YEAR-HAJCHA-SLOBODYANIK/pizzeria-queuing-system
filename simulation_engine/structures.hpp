@@ -56,6 +56,8 @@ struct Order {
     int timestamp_sec;  // время поступления заказа (в секундах!)
     OrderSource source;  // источник заказа
     CustomerType customer_type;  // вид клиента
+    int target_time;  // схоже с мин вейт, актуально для заказов "на потом"
+
     int max_wait_sec;  // сколько клиент готов ждать заказ (в секундах)
     int min_wait_sec;  // через сколько секунд клиенту нужен заказ (в секундах)
 
@@ -128,15 +130,15 @@ struct PizzeriaConfig {
 
     // все касательно ПРЕДПОЛАГАЕМОГО времени, которое отпугивает клиентов
     std::vector<RadiusWaitTimeEntry> radius_wait_map;
-    int est_wait_sec(int r) const {  // ПРЕДПОЛАГАЕМОЕ время приготовления пиццы размера R
+    int est_time_sec(int r) const {  // ПРЕДПОЛАГАЕМОЕ время приготовления пиццы размера R
         for (const auto& rt : radius_wait_map) {
             if (r <= rt.radius_cm)
                 return rt.wait_time;
         }
         return radius_wait_map.back().wait_time;  // массив ДОЛЖЕН БЫТЬ не пустым!!!
     }
-    int online_delay_sec;  // доп ПРЕДПОЛАГАЕМОЕ ожидание онлайн заказа
-    int in_person_delay_sec;  // доп ПРЕДПОЛАГАЕМОЕ ожидание личного заказа
+    int online_delay_sec;  // доп ПРЕДПОЛАГАЕМОЕ ожидание онлайн заказа; нижняя граница target_time
+    int in_person_delay_sec;  // доп ПРЕДПОЛАГАЕМОЕ ожидание личного заказа; нижняя граница target_time
     int quant_step_min;  // шаг квантования ПРЕДПОЛАГАЕМОГО времени ожидания (всегда в большую сторону)
     bool quant_by_clock;  // true: 13:42=>13:45, false: +12min => +15min (только для ПРЕДПОЛАГАЕМОГО времени)
 
