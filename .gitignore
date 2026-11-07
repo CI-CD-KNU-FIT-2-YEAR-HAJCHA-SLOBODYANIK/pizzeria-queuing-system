@@ -1,6 +1,5 @@
-
 # ==========================================
-# Visual Studio / C++ IDE Artifacts
+# Visual Studio / MSBuild / CMake
 # ==========================================
 .vs/
 *.suo
@@ -9,14 +8,9 @@
 *.userosv
 *.sln.docstates
 *.vcxproj.user
-
-# Visual Studio Database & Workspace Cache
-*.VC.db
-*.VC.db-shm
-*.VC.db-wal
+*.VC.db*
 *.VC.opendb
 *.ipch
-*.VC.db*
 *.opensdf
 *.sdf
 *.sqlite
@@ -25,9 +19,6 @@ DocumentLayout*.json
 ProjectSettings.json
 VSWorkspaceState.json
 
-# ==========================================
-# C++ Build & Output Files
-# ==========================================
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -62,30 +53,22 @@ compile_commands.json
 *.dt.module.json
 *.dt.module.json.c*
 
-# ==========================================
-# vcpkg
-# ==========================================
+# vcpkg manifest (vcpkg.json) остаётся в Git
 vcpkg_installed/
 .vcpkg-root/
 
-# Keep vcpkg.json and vcpkg-configuration.json tracked
-
 # ==========================================
-# Python Artifacts
+# Python / Jupyter
 # ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environments
 .venv/
 venv/
 ENV/
 env/
 env.bak/
 venv.bak/
-
-# Testing & Tools
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -96,58 +79,40 @@ htmlcov/
 .ipynb_checkpoints/
 
 # ==========================================
-# Simulation Input Data
+# Generated simulation data — never commit
 # ==========================================
+/pizzeria_python_test/generated/
+/pizzeria_python_test/local_settings.json
 
-# Generated order datasets
-/data/orders/generated/
-/data/orders/temp/
+# Необязательная явная метка для любых генерируемых файлов
+*_NOFORGIT*
 
-# Temporary or generated manifests
-/config/generated/
-/config/temp/
-
-# Locally overridden configuration
-/config/local/
-/config/*.local.json
-
-# ==========================================
-# Simulation Output Data
-# ==========================================
-
-# Generated reports and intermediate files
+# Старые / альтернативные каталоги вывода
 /output/
 /outputs/
 /results/generated/
 /results/temp/
+/data/orders/generated/
+/data/orders/temp/
+/config/generated/
+/config/temp/
+/config/local/
+/config/*.local.json
 
-# Temporary simulation data
 *.json.tmp
 *.jsonl.tmp
 *.partial
 *.part
 
-# Keep reference reports in results/reference/
-# Keep input fixtures in tests/ and examples/
-
 # ==========================================
-# OS / Miscellaneous
+# System artifacts
 # ==========================================
 .DS_Store
 Thumbs.db
 Desktop.ini
-
 *.tmp
 *.bak
 *.log
 
-# ==========================================
-# Explicitly Tracked Project Data
-# ==========================================
-
-# Do not ignore recipe and topping tables.
-# Their CSV/TSV/JSON files remain trackable.
-
-# Do not globally ignore *.json or *.csv.
-# Configurations, manifests, fixtures and
-# dependency manifests must remain trackable.
+# Важно: не игнорируем *.json, *.jsonl или *.csv глобально.
+# Таблицы pizzas/toppings/radius_wait, fixtures и vcpkg.json остаются в Git.
