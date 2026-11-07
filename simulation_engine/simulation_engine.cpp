@@ -116,8 +116,7 @@ public:
         bool tables_id_is_index = false,
         const QueueConfig& queue_config = {})
         : config(simulation_config), recipes(recipes), toppings(toppings),
-        tables_id_is_index(tables_id_is_index),
-        max_ovens(std::max(1, max_ovens)),
+        tables_id_is_index(tables_id_is_index), max_ovens(std::max(1, max_ovens)),
         queue_manager(queue_config) {
         initialize();
     }
@@ -224,6 +223,7 @@ private:
     int last_stream_change_sec = -1;         // Не более одного занятого потока меняет доступность за секунду
     int next_stream_action_sec = -1;         // Следующая попытка применить политику после изменения очереди
     int retirement_allowed_sec = -1;        // Временная граница лояльности при снижении статической мощности
+    std::vector<uint8_t> freeze_deferred_reported; // Один Info на поток до успешной разгрузки
     int previous_static_ovens = -1;         // Предыдущее целевое число печей
     int last_earliest_quote_sec = -1;       // Последняя оперативная оценка окончания нового заказа
 
@@ -276,6 +276,7 @@ private:
             }
             oven_storage.push_back(std::move(oven));
         }
+        freeze_deferred_reported.assign(max_ovens * config.oven_capacity, 0);
         if (!queue_manager.configure_streams(max_ovens * config.oven_capacity, 0))
             fail("QueueManager не смог инициализировать потоки");
         if (desired_ovens(config.opening_time) == 0)
@@ -485,9 +486,10 @@ private:
             // оно так работает, все норм
             const auto ends = curr_plan.variant_id < 0
                 ? queue_manager.put_time(target_start, duration, left_id, right_id,
-                    0, config.closing_time)
+                    min_start, config.closing_time, order_runtime.order_received_sec)
                 : queue_manager.put_time_buffered(curr_plan.variant_id, target_start,
-                    duration, left_id, right_id, 0, config.closing_time);
+                    duration, left_id, right_id, min_start, config.closing_time,
+                    order_runtime.order_received_sec);
 
             OrderPlanBuffer left = curr_plan;
             OrderPlanBuffer right = curr_plan;
@@ -939,6 +941,7 @@ private:
                         return;
                     }
                     slot.accepting_tasks = true;
+                    freeze_deferred_reported[slot.abstract_stream_id] = 0;
                 }
                 if (!apply_runtime_queue_changed(time)) return;
             }
@@ -956,6 +959,7 @@ private:
                         break;
                     }
                     slot.accepting_tasks = true;
+                    freeze_deferred_reported[slot.abstract_stream_id] = 0;
                     last_stream_change_sec = time;
                     if (!apply_runtime_queue_changed(time)) return;
                     next_stream_action_sec = time + 1;
@@ -987,10 +991,15 @@ private:
                         }
                     }
                     if (!queue_manager.freeze_stream(slot.abstract_stream_id, keep_task_id, time)) {
-                        report_issue_at(time, IssueSeverity::Info, "STREAM_FREEZE_DEFERRED",
-                            "Не удалось разгрузить поток " + std::to_string(slot.abstract_stream_id));
+                        const int stream_id = slot.abstract_stream_id;
+                        if (!freeze_deferred_reported[stream_id]) {
+                            report_issue_at(time, IssueSeverity::Info, "STREAM_FREEZE_DEFERRED",
+                                "Не удалось разгрузить поток " + std::to_string(stream_id));
+                            freeze_deferred_reported[stream_id] = 1;
+                        }
                         break; // Текущая печь остаётся включённой.
                     }
+                    freeze_deferred_reported[slot.abstract_stream_id] = 0;
                     slot.accepting_tasks = false;
                     if (!empty) last_stream_change_sec = time;
                     if (!apply_runtime_queue_changed(time)) return;
@@ -1147,11 +1156,10 @@ private:
         slot.task_id = -1;
         slot.busy_until_sec = -1;
         const int unused = reserved_finish - time;
-        if (unused > 0 && queue_manager.stream_enabled(stream_id) && slot.accepting_tasks &&  // возможно дублирование?
+        if (unused > 0 && slot.accepting_tasks &&
             !queue_manager.shift_stream_left(stream_id, unused, time)) {
-            report_issue_at(time, IssueSeverity::Warning,
-                "STREAM_SHIFT_FAILED",
-                "Не удалось сдвинуть задачи потока " + std::to_string(stream_id));
+            report_issue_at(time, IssueSeverity::Warning, "STREAM_SHIFT_FAILED",
+                "Не удалось сдвинуть поток " + std::to_string(stream_id));
         }
         if (!apply_runtime_queue_changed(time)) return;
         finish_order(order_storage[task.runtime_order_index], time);

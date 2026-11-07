@@ -29,11 +29,13 @@ public:
 
     static EngineInsertResult insert(const std::vector<QueueTaskItem>& existing,
         const std::vector<uint8_t>& enabled, int target_sec, int duration_sec,
-        int temporary_id, int min_sec, int max_sec, const QueueConfig& cfg);
+        int temporary_id, int min_sec, int max_sec, const QueueConfig& cfg,
+        int current_sec = 0);
 
     // Полная перепаковка с фиксированной задачей на закрываемом потоке.
     // В случае неуспеха входной массив не изменяется.
     static bool repack(const std::vector<QueueTaskItem>& original,
         const std::vector<uint8_t>& enabled, int closing_stream_id, int preserved_task_id,
-        const QueueConfig& cfg, std::vector<QueueTaskItem>& output);
+        const QueueConfig& cfg, std::vector<QueueTaskItem>& output,
+        int current_sec = 0);
 };

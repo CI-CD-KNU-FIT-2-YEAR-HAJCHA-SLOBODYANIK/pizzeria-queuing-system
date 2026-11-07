@@ -39,7 +39,16 @@ struct QueueEvent {
 
 // Быстрый режим не перемещает принятые задачи при вставке. Углублённый
 // ищет ограниченное число перестановок и может улучшить ближайшие времена.
-enum class QueueSearchMode : uint8_t { Fast = 0, Bounded = 1 };
+enum class QueueSearchMode : uint8_t {
+    Fast = 0,
+    Bounded = 1,
+    LiteBrute = 2,  // Зарезервировано, алгоритм пока не реализован
+    EnclaveTree = 3 // Зарезервировано, алгоритм пока не реализован
+};
+
+inline bool queue_mode_implemented(QueueSearchMode mode) {
+    return mode == QueueSearchMode::Fast || mode == QueueSearchMode::Bounded;
+}
 
 struct QueueConfig {
     QueueSearchMode mode = QueueSearchMode::Bounded;
@@ -83,12 +92,13 @@ public:
 
     // поиск подходящего времени вставки в активную очередь слева и справа от целевого. вощвращает концы
     std::pair<int, int> put_time(int target_sec, int duration_sec, int& left_id, int& right_id,
-        int min_sec = 0, int max_sec = SECONDS_PER_DAY);
+        int min_sec = 0, int max_sec = SECONDS_PER_DAY, int current_sec = 0);
     // лефт айди и райт айди - айди буферизированных очередей куда вставилась задача с временем инт фирст инт секонд
 
     // поиск подходящего времени вставки в буферрную очередь слева и справа от целевого. вощвращает концы
     std::pair<int, int> put_time_buffered(int queue_id, int target_sec, int duration_sec,
-        int& left_id, int& right_id, int min_sec = 0, int max_sec = SECONDS_PER_DAY);
+        int& left_id, int& right_id, int min_sec = 0, int max_sec = SECONDS_PER_DAY,
+        int current_sec = 0);
     // если очередь айди меньше 0 то мы просто делаем для активной
 
     // удаление задачи из текущей очереди по ее ID (выполнена/отменена). сбрасывает варианты!
@@ -119,11 +129,12 @@ private:
     std::deque<Variant> queue_variants_;
     int next_variant_id_ = 0;
 
-    bool apply_variant_items(int id, const std::vector<QueueTaskPlacement>& placements);
+    bool apply_variant_items(int id, const std::vector<QueueTaskPlacement>& placements,
+        int current_sec);
     void drop_variants();
     int add_variant(std::vector<QueueTaskItem> items, int pending_count);
     const Variant* variant_at(int id) const;
     std::pair<int, int> put_impl(const Variant* base, int target_sec, int duration_sec,
-        int& left_id, int& right_id, int min_sec, int max_sec);
+        int& left_id, int& right_id, int min_sec, int max_sec, int current_sec);
     bool validate_current(const std::vector<QueueTaskItem>& items, const std::vector<uint8_t>& accepting) const;
 };

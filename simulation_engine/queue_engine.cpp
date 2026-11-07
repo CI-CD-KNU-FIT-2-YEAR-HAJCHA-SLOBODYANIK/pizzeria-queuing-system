@@ -114,11 +114,11 @@ namespace {
     // Посекундный перебор всей смены не требуется.
     std::vector<CandidateMove> choices(const std::vector<QueueTaskItem>& tasks,
         const std::vector<uint8_t>& enabled, int idx, int target, int probe_duration,
-        int cap) {
+        int cap, int current_sec) {
         const QueueTaskItem& t = tasks[idx];
         std::vector<CandidateMove> out;
         if (fixed(t)) return out;
-        const int lo = t.min_deadline_sec;
+        const int lo = std::max(t.min_deadline_sec, current_sec);
         const int hi = t.max_deadline_sec - t.cooking_time_sec;
         if (lo > hi) return out;
         for (int stream = 0; stream < int(enabled.size()); ++stream) {
@@ -202,6 +202,7 @@ namespace {
         std::vector<RepackItem> move_list;
         int visited = 0;
         bool exhaustive = false;
+        int current_sec = 0;
 
         bool dfs(int pos) {
             if (++visited > (exhaustive ? cfg.max_repack_nodes : 1 + int(move_list.size()))) return false;
@@ -210,7 +211,7 @@ namespace {
                 return true;
             }
             const QueueTaskItem& t = original[move_list[pos].index];
-            const int lo = t.min_deadline_sec;
+            const int lo = std::max(t.min_deadline_sec, current_sec);
             const int hi = t.max_deadline_sec - t.cooking_time_sec;
             if (lo > hi) return false;
             std::vector<CandidateMove> possibilities;
@@ -265,10 +266,15 @@ bool QueueEngine::valid(const std::vector<QueueTaskItem>& tasks,
 
 EngineInsertResult QueueEngine::insert(const std::vector<QueueTaskItem>& original,
     const std::vector<uint8_t>& enabled, int target, int duration, int temporary_id,
-    int min_sec, int max_sec, const QueueConfig& cfg) {
+    int min_sec, int max_sec, const QueueConfig& cfg, int current_sec) {
     EngineInsertResult result;
-    if (duration <= 0 || min_sec < 0 || max_sec > cfg.max_time_sec ||
-        max_sec - min_sec < duration || !valid(original, enabled)) return result;
+    if (!queue_mode_implemented(cfg.mode)) return result;
+    if (duration <= 0 || min_sec < 0 || current_sec < 0 ||
+        max_sec > cfg.max_time_sec || max_sec - min_sec < duration ||
+        min_sec < current_sec || !valid(original, enabled)) return result;
+    // Устаревшее расписание не должно становиться базой нового плана.
+    for (const auto& t : original)
+        if (!fixed(t) && t.start_time_sec < current_sec) return result;
 
     evaluate(original, original, enabled, target, duration, temporary_id, min_sec, max_sec, result);
     if (cfg.mode == QueueSearchMode::Fast ||
@@ -288,7 +294,7 @@ EngineInsertResult QueueEngine::insert(const std::vector<QueueTaskItem>& origina
         const std::vector<int> ids = blockers(node.tasks, target, duration);
         for (int idx : ids) {
             for (const CandidateMove& move : choices(node.tasks, enabled, idx, target,
-                duration, std::max(1, cfg.max_branch_per_task))) {
+                duration, std::max(1, cfg.max_branch_per_task), current_sec)) {
                 auto changed = node.tasks;
                 changed[idx].start_time_sec = move.start;
                 changed[idx].stream_id = move.stream;
@@ -318,11 +324,14 @@ EngineInsertResult QueueEngine::insert(const std::vector<QueueTaskItem>& origina
 
 bool QueueEngine::repack(const std::vector<QueueTaskItem>& original,
     const std::vector<uint8_t>& enabled, int closing_stream_id, int preserved_task_id,
-    const QueueConfig& cfg, std::vector<QueueTaskItem>& output) {
-    RepackSearch solver{ original, enabled, cfg, {}, {}, {}, 0, false };
+    const QueueConfig& cfg, std::vector<QueueTaskItem>& output, int current_sec) {
+    if (current_sec < 0 || !queue_mode_implemented(cfg.mode)) return false;
+    RepackSearch solver{ original, enabled, cfg, {}, {}, {}, 0, false, current_sec };
     for (int i = 0; i < int(original.size()); ++i) {
         const auto& t = original[i];
         const bool pinned = t.task_id == preserved_task_id || fixed(t);
+        // Прошедшую незакреплённую подготовку нельзя переносить задним числом.
+        if (!pinned && t.start_time_sec < current_sec) return false;
         if (pinned) {
             // Другую уже закреплённую задачу запрещено выталкивать с закрытого потока.
             if (t.stream_id == closing_stream_id && t.task_id != preserved_task_id) return false;

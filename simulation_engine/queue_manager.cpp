@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <stdexcept>
 #include <unordered_set>
 #include <utility>
 
@@ -22,6 +23,8 @@ namespace {
 }
 
 QueueManager::QueueManager(QueueConfig cfg) : config_(cfg) {
+    if (!queue_mode_implemented(config_.mode))
+        throw std::invalid_argument("Queue algorithm is not implemented");
     if (config_.max_variants < 4) config_.max_variants = 4;
     if (config_.max_search_nodes < 1) config_.max_search_nodes = 1;
     if (config_.max_repack_nodes < 1) config_.max_repack_nodes = 1;
@@ -30,7 +33,7 @@ QueueManager::QueueManager(QueueConfig cfg) : config_(cfg) {
 }
 
 bool QueueManager::set_config(const QueueConfig& cfg) {
-    if (!current_queue.empty()) return false;
+    if (!current_queue.empty() || !queue_mode_implemented(cfg.mode)) return false;
     config_ = cfg;
     if (config_.max_variants < 4) config_.max_variants = 4;
     if (config_.max_search_nodes < 1) config_.max_search_nodes = 1;
@@ -76,7 +79,7 @@ bool QueueManager::validate_current(const std::vector<QueueTaskItem>& items,
     return true;
 }
 
-bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int) {
+bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int curr_time_clear_sec) {
     if (!stream_enabled(stream_id)) return false;
     if (keep_task_id >= 0) {
         auto it = std::find_if(current_queue.begin(), current_queue.end(),
@@ -87,7 +90,7 @@ bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int) {
     enabled[stream_id] = 0;
     std::vector<QueueTaskItem> output;
     if (!QueueEngine::repack(current_queue, enabled, stream_id, keep_task_id,
-        config_, output) || !validate_current(output, enabled)) return false;
+        config_, output, curr_time_clear_sec) || !validate_current(output, enabled)) return false;
     // Выключенный поток не содержит иных задач, кроме сохранённой выполняющейся.
     for (const auto& t : output)
         if (t.stream_id == stream_id && t.task_id != keep_task_id) return false;
@@ -125,7 +128,7 @@ bool QueueManager::compress(int target, int curr_time_clear_sec, bool apply) {
             proposed_flags[s] = 0;
             std::vector<QueueTaskItem> repacked;
             if (!QueueEngine::repack(candidate, proposed_flags, s, keep,
-                config_, repacked) || !validate_current(repacked, proposed_flags)) continue;
+                config_, repacked, curr_time_clear_sec) || !validate_current(repacked, proposed_flags)) continue;
             candidate = std::move(repacked);
             enabled = std::move(proposed_flags);
             --count;
@@ -138,7 +141,6 @@ bool QueueManager::compress(int target, int curr_time_clear_sec, bool apply) {
     stream_accepting_ = std::move(enabled);
     ovens_count = target;
     drop_variants();
-    (void)curr_time_clear_sec;
     return true;
 }
 
@@ -197,13 +199,15 @@ int QueueManager::add_variant(std::vector<QueueTaskItem> items, int pending_coun
 }
 
 std::pair<int, int> QueueManager::put_impl(const Variant* base, int target_sec,
-    int duration_sec, int& left_id, int& right_id, int min_sec, int max_sec) {
+    int duration_sec, int& left_id, int& right_id, int min_sec, int max_sec,
+    int current_sec) {
     left_id = right_id = -1;
-    if (!base || duration_sec <= 0 || min_sec < 0 || max_sec > config_.max_time_sec ||
+    if (!base || duration_sec <= 0 || min_sec < current_sec || current_sec < 0 ||
+        max_sec > config_.max_time_sec ||
         min_sec >= max_sec || base->pending_count >= INT_MAX - 1) return { -1, -1 };
     const int new_id = -(base->pending_count + 1);
     const auto solutions = QueueEngine::insert(base->items, stream_accepting_,
-        target_sec, duration_sec, new_id, min_sec, max_sec, config_);
+        target_sec, duration_sec, new_id, min_sec, max_sec, config_, current_sec);
     int left_end = -1, right_end = -1;
     if (solutions.left.found) {
         left_end = solutions.left.start_sec + duration_sec;
@@ -219,31 +223,37 @@ std::pair<int, int> QueueManager::put_impl(const Variant* base, int target_sec,
 }
 
 std::pair<int, int> QueueManager::put_time(int target_sec, int duration_sec,
-    int& left_id, int& right_id, int min_sec, int max_sec) {
+    int& left_id, int& right_id, int min_sec, int max_sec, int current_sec) {
     Variant base;
     base.items = current_queue;
-    return put_impl(&base, target_sec, duration_sec, left_id, right_id, min_sec, max_sec);
+    return put_impl(&base, target_sec, duration_sec, left_id, right_id,
+        min_sec, max_sec, current_sec);
 }
 
 std::pair<int, int> QueueManager::put_time_buffered(int queue_id, int target_sec,
-    int duration_sec, int& left_id, int& right_id, int min_sec, int max_sec) {
+    int duration_sec, int& left_id, int& right_id, int min_sec, int max_sec, int current_sec) {
     if (queue_id < 0) return put_time(target_sec, duration_sec,
-        left_id, right_id, min_sec, max_sec);
+        left_id, right_id, min_sec, max_sec, current_sec);
     // Копируем базу: добавление вариантов может удалить старую запись deque.
     const Variant* base = variant_at(queue_id);
     if (!base) { left_id = right_id = -1; return { -1, -1 }; }
     Variant snapshot = *base;
     return put_impl(&snapshot, target_sec, duration_sec,
-        left_id, right_id, min_sec, max_sec);
+        left_id, right_id, min_sec, max_sec, current_sec);
 }
 
 bool QueueManager::apply_variant_items(int id,
-    const std::vector<QueueTaskPlacement>& placements) {
+    const std::vector<QueueTaskPlacement>& placements, int current_sec) {
+    if (current_sec < 0) return false;
     const Variant* v = variant_at(id);
     if (!v || v->pending_count != int(placements.size())) return false;
     auto candidate = v->items;
     std::unordered_set<int> ids;
-    for (const auto& old : current_queue) ids.insert(old.task_id);
+    for (const auto& old : current_queue) {
+        // Только зафиксированные, уже начатые задачи могут оставаться в прошлом.
+        if (!is_locked(old) && old.start_time_sec < current_sec) return false;
+        ids.insert(old.task_id);
+    }
     for (int n = 0; n < int(placements.size()); ++n) {
         const auto& p = placements[n];
         if (p.task_id < 0 || p.min_deadline_sec < 0 || p.max_deadline_sec < 0 ||
@@ -253,7 +263,7 @@ bool QueueManager::apply_variant_items(int id,
         if (it == candidate.end()) return false;
         const int64_t end = int64_t(it->start_time_sec) + it->cooking_time_sec;
         if (p.min_deadline_sec > it->start_time_sec || end > p.max_deadline_sec ||
-            !stream_enabled(it->stream_id)) return false;
+            it->start_time_sec < current_sec || !stream_enabled(it->stream_id)) return false;
         it->task_id = p.task_id;
         it->min_deadline_sec = p.min_deadline_sec;
         it->max_deadline_sec = p.max_deadline_sec;
@@ -267,6 +277,16 @@ bool QueueManager::apply_variant_items(int id,
                 (it->stream_id != old.stream_id || it->start_time_sec != old.start_time_sec)))
             return false;
     }
+    // Старые закреплённые задачи сохраняются точно, новые и ещё не начатые
+    // не имеют права начинаться раньше текущей секунды.
+    for (const auto& task : candidate) {
+        if (task.start_time_sec >= current_sec) continue;
+        const auto it = std::find_if(current_queue.begin(), current_queue.end(),
+            [&](const auto& old) { return old.task_id == task.task_id; });
+        if (it == current_queue.end() || !is_locked(*it) ||
+            it->start_time_sec != task.start_time_sec || it->stream_id != task.stream_id)
+            return false;
+    }
     if (!validate_current(candidate, stream_accepting_)) return false;
     sort_queue(candidate);
     current_queue = std::move(candidate);
@@ -275,8 +295,8 @@ bool QueueManager::apply_variant_items(int id,
 }
 
 bool QueueManager::apply_variant(int id,
-    const std::vector<QueueTaskPlacement>& placements, int) {
-    return apply_variant_items(id, placements);
+    const std::vector<QueueTaskPlacement>& placements, int now) {
+    return apply_variant_items(id, placements, now);
 }
 
 bool QueueManager::apply_variant(int id, QueueTaskPlacement& placement, int now) {

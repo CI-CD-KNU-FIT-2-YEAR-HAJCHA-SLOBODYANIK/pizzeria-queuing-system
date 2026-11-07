@@ -196,7 +196,13 @@ namespace {
             const std::string s = string(*mode, "queue.mode");
             if (s == "fast") q.mode = QueueSearchMode::Fast;
             else if (s == "bounded") q.mode = QueueSearchMode::Bounded;
-            else throw std::runtime_error("queue.mode must be fast or bounded");
+            else if (s == "lite-brute") q.mode = QueueSearchMode::LiteBrute;
+            else if (s == "enclave-tree") q.mode = QueueSearchMode::EnclaveTree;
+            else throw std::runtime_error("Unknown queue.mode '" + s +
+                "'. Supported names: fast, bounded, lite-brute, enclave-tree");
+            if (!queue_mode_implemented(q.mode))
+                throw std::runtime_error("Queue algorithm '" + s +
+                    "' is recognized but NOT IMPLEMENTED; no simulations started");
         }
         q.max_search_nodes = optional_int(j, "max_search_nodes", q.max_search_nodes);
         q.max_repack_nodes = optional_int(j, "max_repack_nodes", q.max_repack_nodes);
@@ -429,7 +435,7 @@ namespace {
             else if (flag == "--help" || flag == "-h") {
                 std::cout << "Usage: pizzeria --manifest plan.json [--threads N] [--interactive] [--overwrite]\n"
                     << "   [--orders PATH] [--recipes PATH] [--toppings PATH] [--output-dir PATH]\n"
-                    << "   [--queue-mode fast|bounded] [--set all:key=json] [--set run_id:key=json]\n"
+                    << "   [--queue-mode fast|bounded|lite-brute|enclave-tree] [--set all:key=json] [--set run_id:key=json]\n"
                     << "Interactive commands: status, stop RUN_ID, stop-all, wait, exit\n";
                 std::exit(0);
             }
