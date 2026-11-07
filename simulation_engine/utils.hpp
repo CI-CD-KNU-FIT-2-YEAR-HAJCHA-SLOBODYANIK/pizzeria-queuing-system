@@ -3,6 +3,12 @@
 #include <utility>
 #include <tuple>
 
+constexpr int SECONDS_PER_DAY = 86400;
+
+static int ceil_div(int x, int by) {  // целочисленное деление с округлением к большему
+    return x <= 0 ? 0 : (x + by - 1) / by;
+}
+
 inline int time_to_min(const std::pair<int, int>& time) {  // время в минуты. первое - часы, второе - минуты
     return time.first * 60 + time.second;
 }
@@ -29,4 +35,4 @@ inline int time_to_sec(const std::tuple<int, int, int>& time) {  // время �
 inline std::tuple<int, int, int> sec_to_time(int total_seconds) {  // секунды во время. возвращает первое - часы, второе - минуты, третье - секунды
     return { total_seconds / 3600, (total_seconds % 3600) / 60, total_seconds % 60 };
 }
-// оверрайдить sec_to_time для работы с минуточасами нет смысла
+// оверрайдить sec_to_time для работы с минуточасами нет смысла лол

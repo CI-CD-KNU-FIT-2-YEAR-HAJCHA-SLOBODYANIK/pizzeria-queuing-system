@@ -1,5 +1,5 @@
 # ==========================================
-# Visual Studio / C++ IDE Artifacts
+# Visual Studio / MSBuild / CMake
 # ==========================================
 .vs/
 *.suo
@@ -8,22 +8,17 @@
 *.userosv
 *.sln.docstates
 *.vcxproj.user
-
-# Visual Studio Database & Workspace Cache
-*.VC.db
-*.VC.db-shm
-*.VC.db-wal
+*.VC.db*
 *.VC.opendb
 *.ipch
+*.opensdf
+*.sdf
 *.sqlite
 slnx.sqlite
 DocumentLayout*.json
 ProjectSettings.json
 VSWorkspaceState.json
 
-# ==========================================
-# C++ Build & Output Files
-# ==========================================
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -31,6 +26,14 @@ x86/
 [Bb]in/
 [Oo]bj/
 build/
+cmake-build-*/
+out/build/
+out/install/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
 *.exe
 *.dll
 *.so
@@ -44,39 +47,72 @@ build/
 *.ilk
 *.idb
 *.exp
+*.tlog
+*.lastbuildstate
 *.dt.d.json
 *.dt.module.json
 *.dt.module.json.c*
 
+# vcpkg manifest (vcpkg.json) остаётся в Git
+vcpkg_installed/
+.vcpkg-root/
+
 # ==========================================
-# Python Artifacts
+# Python / Jupyter
 # ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-
-# Environments
 .venv/
 venv/
 ENV/
 env/
 env.bak/
 venv.bak/
-
-# Testing & Tools
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 *.egg-info/
 .ipynb_checkpoints/
 
 # ==========================================
-# OS / Miscellaneous
+# Generated simulation data — never commit
+# ==========================================
+/pizzeria_python_test/generated/
+/pizzeria_python_test/local_settings.json
+
+# Необязательная явная метка для любых генерируемых файлов
+*_NOFORGIT*
+
+# Старые / альтернативные каталоги вывода
+/output/
+/outputs/
+/results/generated/
+/results/temp/
+/data/orders/generated/
+/data/orders/temp/
+/config/generated/
+/config/temp/
+/config/local/
+/config/*.local.json
+
+*.json.tmp
+*.jsonl.tmp
+*.partial
+*.part
+
+# ==========================================
+# System artifacts
 # ==========================================
 .DS_Store
 Thumbs.db
+Desktop.ini
 *.tmp
+*.bak
 *.log
+
+# Важно: не игнорируем *.json, *.jsonl или *.csv глобально.
+# Таблицы pizzas/toppings/radius_wait, fixtures и vcpkg.json остаются в Git.
