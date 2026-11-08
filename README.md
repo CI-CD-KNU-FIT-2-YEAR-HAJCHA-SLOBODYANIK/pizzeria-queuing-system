@@ -1,7 +1,7 @@
 # Pizzeria Queuing System Optimization & Active Ovens Management
 
-**Course**: Computer Modeling of Processes (3rd Year, Semester 1)  
-**Topic**: Option 4 – Discrete-event & Analytical Queueing Modeling of a Pizzeria Baking Line with Dynamic Oven Management ($M/M/c/m$).  
+**Course**: Computer Modeling of Processes (3rd Year, Semester 1)
+**Topic**: Option 4 – Discrete-event & Analytical Queueing Modeling of a Pizzeria Baking Line with Dynamic Oven Management ($M/M/c/m$).
 **Operating Hours**: 09:00 – 22:00 (780 minutes / 13 hours total, time step $\Delta t = 5\text{ min}$, queue capacity $m = 10$, total oven limit $\le 10$).
 
 ---
@@ -9,8 +9,52 @@
 ## Team Roles & Structure
 
 - **Role 1 (Simulation Engine Developer)**: C++ discrete-event core simulation engine (`simulation_engine/`).
-- **Role 2 (Simulation Modeler & Data Analyst)**: Experimentation, parameter calibration, comparative graphs, and Monte Carlo runs.
+- **Role 2 (Simulation Modeler & Data Analyst)**: Experimentation, parameter calibration, dataset generation (`generator.py`), output JSON analysis (`analyzer.py`), comparative graphs (`visualizer.py`), and Monte Carlo runs.
 - **Role 3 (Theoretical Modeler & Technical Writer)**: Analytical $M/M/c/m$ queueing theory solver, steady-state mathematical formulations, financial model, and documentation.
+
+---
+
+## Data Analysis & Simulation Pipeline (Role 2)
+
+Role 2 provides a complete Python automation suite for synthetic workload generation, automated output report parsing, verification against theoretical models, and visualization.
+
+### Quick Start (Python Pipeline)
+
+1. **Generate synthetic order flow**:
+   ```bash
+   python pizzeria_python_test/generator.py --output pizzeria_python_test/data/orders.jsonl --count 100 --seed 42
+   ```
+
+2. **Run C++ Simulation Engine across oven configurations**:
+   ```bash
+   .\simulation_engine.exe --manifest manifest.json --overwrite
+   ```
+
+3. **Analyze simulation outputs vs. theoretical $M/M/c/m$ model**:
+   ```bash
+   python pizzeria_python_test/analyzer.py
+   ```
+
+4. **Generate comparative plots**:
+   ```bash
+   python pizzeria_python_test/visualizer.py
+   ```
+
+### Experimental Results & Validation
+
+Empirical evaluation of 5 oven configurations (2, 3, 4, 7, and 9 active ovens) under a simulated workload of 100 orders:
+
+| Run ID | Active Ovens ($c$) | Sim $P_{\text{loss}}$ (%) | Theory $P_{\text{loss}}$ (%) | Sim Wait Time (min) | Net Profit (UAH) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `run_2_ovens` | 2 | 35.0% | 0.21% | 39.60 | 10 905.84 |
+| `run_3_ovens` | 3 | 20.0% | 0.00% | 36.20 | 14 344.01 |
+| `run_4_ovens` | 4 | 10.0% | 0.00% | 32.37 | 16 069.95 |
+| **`run_7_ovens`** | **7** | **1.0%** | **0.00%** | **27.20** | **16 734.16** |
+| `run_9_ovens` | 9 | 1.0% | 0.00% | 26.28 | 15 947.32 |
+
+**Generated Visualization Artifacts:**
+- **Net Profit Curve**: `images/profit_vs_ovens.png`
+- **Loss Rate Comparison**: `images/p_loss_comparison.png`
 
 ---
 
