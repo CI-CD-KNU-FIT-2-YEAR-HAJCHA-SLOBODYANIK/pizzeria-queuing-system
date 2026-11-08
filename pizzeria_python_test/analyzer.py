@@ -1,12 +1,23 @@
 """
-Модуль аналізу результатів імітаційного моделювання.
-Порівнює вихідні JSON-звіти C++ движка з теоретичною моделлю (analytical_solver.py).
+Модуль аналізу результатів імітаційного моделювання (Учасник 2).
+Порівнює вихідні JSON-звіти C++ движка з теоретичною моделлю (analytical/solver.py).
 """
 
+import sys
 import json
 from pathlib import Path
 from typing import Dict, Any, List
-from analytical_solver import solve_mmcm
+
+# Додаємо корінь проєкту до sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Підключаємо імпортування з папки analytical або прямого файла
+try:
+    from analytical.solver import solve_mmcm
+except ImportError:
+    from analytical_solver import solve_mmcm
 
 
 def load_simulation_report(json_path: Path) -> Dict[str, Any]:
@@ -80,10 +91,10 @@ def print_comparison_table(results: List[Dict[str, Any]]) -> None:
 
 
 if __name__ == "__main__":
-    output_dir = Path("output")
-    if output_dir.exists():
+    output_dir = PROJECT_ROOT / "output"
+    if output_dir.exists() and list(output_dir.glob("*.json")):
         reports = list(output_dir.glob("*.json"))
         parsed_results = [analyze_run_vs_theory(r) for r in reports]
         print_comparison_table(parsed_results)
     else:
-        print("Папка output/ порожня або відсутня. Запустіть C++ двигун для отримання звітів.")
+        print(f"Папка {output_dir} порожня або відсутня. Запустіть C++ двигун для отримання звітів.")

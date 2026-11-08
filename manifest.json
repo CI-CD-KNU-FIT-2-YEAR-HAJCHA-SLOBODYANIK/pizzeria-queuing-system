@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "parallelism": 4,
+  "max_ovens": 10,
+  "output_dir": "output",
+  "include_oven_events": true,
+  "tables_id_is_index": false,
+  "queue": {
+    "mode": "bounded",
+    "max_search_nodes": 600,
+    "max_repack_nodes": 3000,
+    "max_branch_per_task": 20,
+    "max_variants": 16,
+    "max_time_sec": 86400
+  },
+  "shared": {
+    "recipes": "pizzeria_python_test/data/recipes.csv",
+    "toppings": "pizzeria_python_test/data/toppings.csv",
+    "orders": "pizzeria_python_test/data/orders.jsonl",
+    "config": {
+      "opening_time": 32400,
+      "closing_time": 79200,
+      "ingredient_price_g": {
+        "meat": 0.3,
+        "dough": 0.05,
+        "cheese": 0.2,
+        "veg": 0.1,
+        "seafood": 0.4
+      },
+      "oven_cost_sec": 0.0166,
+      "idle_power_ratio": 0.5,
+      "heat_up_sec": 300,
+      "cool_down_sec": 300,
+      "oven_capacity": 1,
+      "radius_wait_map": [
+        {"radius_cm": 30, "wait_time": 600},
+        {"radius_cm": 42, "wait_time": 900}
+      ],
+      "online_delay_sec": 300,
+      "in_person_delay_sec": 120,
+      "quant_step_min": 5,
+      "quant_by_clock": true,
+      "max_early_prep_sec": 1200,
+      "soft_delay_limit_sec": 300,
+      "static_policy": [{"time": 0, "target_ovens": 4}],
+      "dynamic_policy": []
+    }
+  },
+  "runs": [
+    {"id": "run_2_ovens", "max_ovens": 2, "config": {"static_policy": [{"time": 0, "target_ovens": 2}]}},
+    {"id": "run_3_ovens", "max_ovens": 3, "config": {"static_policy": [{"time": 0, "target_ovens": 3}]}},
+    {"id": "run_4_ovens", "max_ovens": 4, "config": {"static_policy": [{"time": 0, "target_ovens": 4}]}},
+    {"id": "run_7_ovens", "max_ovens": 7, "config": {"static_policy": [{"time": 0, "target_ovens": 7}]}},
+    {"id": "run_9_ovens", "max_ovens": 9, "config": {"static_policy": [{"time": 0, "target_ovens": 9}]}}
+  ]
+}
