@@ -2,7 +2,7 @@
 
 **Course**: Computer Modeling of Processes (3rd Year, Semester 1)
 **Topic**: Option 4 – Discrete-event & Analytical Queueing Modeling of a Pizzeria Baking Line with Dynamic Oven Management ($M/M/c/m$).
-**Operating Hours**: 09:00 – 22:00 (780 minutes / 13 hours total, time step $\Delta t = 5\text{ min}$, queue capacity $m = 10$, total oven limit $\le 10$).
+**Operating Hours**: 09:00 – 22:00 (780 minutes / 13 hours total, time step $\Delta t = 1\text{ sec}$).
 
 ---
 
