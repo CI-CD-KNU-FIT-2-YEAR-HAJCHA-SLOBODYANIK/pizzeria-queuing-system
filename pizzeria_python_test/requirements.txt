@@ -1,2 +1,12 @@
+# Core Data Analysis & Visualization
 numpy>=1.24
+
 matplotlib>=3.7
+
+Pillow>=9.5.0
+
+# CLI & Interface Enhancements
+rich>=13.0.0
+
+# Testing & QA
+pytest>=7.0.0
