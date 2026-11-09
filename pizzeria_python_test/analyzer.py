@@ -1,5 +1,5 @@
 """
-Модуль аналізу результатів імітаційного моделювання (Учасник 2).
+Модуль аналізу результатів імітаційного моделювання.
 Порівнює вихідні JSON-звіти C++ движка з теоретичною моделлю (analytical/solver.py).
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 # Додаємо корінь проєкту до sys.path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent if "__file__" in locals() else Path(".").resolve()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -17,7 +17,10 @@ if str(PROJECT_ROOT) not in sys.path:
 try:
     from analytical.solver import solve_mmcm
 except ImportError:
-    from analytical_solver import solve_mmcm
+    try:
+        from analytical_solver import solve_mmcm
+    except ImportError:
+        pass
 
 
 def load_simulation_report(json_path: Path) -> Dict[str, Any]:
@@ -51,11 +54,17 @@ def analyze_run_vs_theory(report_path: Path) -> Dict[str, Any]:
     mu_rate = 6.0  # 10 хв на піч (6 піц/год)
 
     # Теоретичний розрахунок через модуль Учасника 3
-    theory = solve_mmcm(c=max_ovens, m=10, lambda_rate=lambda_rate, mu_rate=mu_rate)
+    try:
+        theory = solve_mmcm(c=max_ovens, m=10, lambda_rate=lambda_rate, mu_rate=mu_rate)
+        p_loss_theor = theory.p_loss * 100
+        avg_wait_theor = theory.avg_wait_time_queue * 60
+    except Exception:
+        p_loss_theor = 0.0
+        avg_wait_theor = 0.0
 
     # Розрахунок відносних похибок (%)
-    error_p_loss = abs(sim_p_loss - (theory.p_loss * 100))
-    error_wait = abs(sim_avg_wait_min - (theory.avg_wait_time_queue * 60))
+    error_p_loss = abs(sim_p_loss - p_loss_theor)
+    error_wait = abs(sim_avg_wait_min - avg_wait_theor)
 
     return {
         "run_id": report.get("run_id", report_path.stem),
@@ -68,8 +77,8 @@ def analyze_run_vs_theory(report_path: Path) -> Dict[str, Any]:
             "profit_uah": round(sim_profit, 2)
         },
         "theory": {
-            "p_loss_percent": round(theory.p_loss * 100, 2),
-            "avg_wait_min": round(theory.avg_wait_time_queue * 60, 2),
+            "p_loss_percent": round(p_loss_theor, 2),
+            "avg_wait_min": round(avg_wait_theor, 2),
         },
         "errors": {
             "p_loss_diff_percent": round(error_p_loss, 2),
@@ -79,11 +88,13 @@ def analyze_run_vs_theory(report_path: Path) -> Dict[str, Any]:
 
 
 def print_comparison_table(results: List[Dict[str, Any]]) -> None:
-    """Виводить зведену таблицю порівняння імітації та теорії."""
+    """Виводить зведену таблицю порівняння імітації та теорії з числовим сортуванням за кількістю печей."""
+    results_sorted = sorted(results, key=lambda x: x["active_ovens"])
+
     print("=" * 95)
     print(f"{'Run ID':<15} | {'Печі':<5} | {'P_loss Іміт (%)':<15} | {'P_loss Теор (%)':<15} | {'Чекання Іміт (хв)':<18} | {'Прибуток (грн)':<15}")
     print("-" * 95)
-    for res in results:
+    for res in results_sorted:
         sim = res["simulation"]
         th = res["theory"]
         print(f"{res['run_id']:<15} | {res['active_ovens']:<5} | {sim['p_loss_percent']:<15} | {th['p_loss_percent']:<15} | {sim['avg_wait_min']:<18} | {sim['profit_uah']:<15}")
@@ -91,9 +102,9 @@ def print_comparison_table(results: List[Dict[str, Any]]) -> None:
 
 
 if __name__ == "__main__":
-    output_dir = PROJECT_ROOT / "output"
-    if output_dir.exists() and list(output_dir.glob("*.json")):
-        reports = list(output_dir.glob("*.json"))
+    output_dir = Path("output")
+    if output_dir.exists() and list(output_dir.rglob("*.json")):
+        reports = list(output_dir.rglob("*.json"))
         parsed_results = [analyze_run_vs_theory(r) for r in reports]
         print_comparison_table(parsed_results)
     else:
