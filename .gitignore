@@ -81,6 +81,10 @@ htmlcov/
 # ==========================================
 # Generated simulation data — never commit
 # ==========================================
+manifest.json
+images/*.png
+pizzeria_python_test/data/orders.jsonl
+
 /pizzeria_python_test/generated/
 /pizzeria_python_test/local_settings.json
 
@@ -113,6 +117,3 @@ Desktop.ini
 *.tmp
 *.bak
 *.log
-
-# Важно: не игнорируем *.json, *.jsonl или *.csv глобально.
-# Таблицы pizzas/toppings/radius_wait, fixtures и vcpkg.json остаются в Git.

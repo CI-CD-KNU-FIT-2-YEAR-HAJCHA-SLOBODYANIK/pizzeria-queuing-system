@@ -20,25 +20,17 @@ Role 2 provides a complete Python automation suite for synthetic workload genera
 
 ### Quick Start (Python Pipeline)
 
-1. **Generate synthetic order flow**:
-   ```bash
-   python pizzeria_python_test/generator.py --output pizzeria_python_test/data/orders.jsonl --count 100 --seed 42
-   ```
+# Start through graphical interface (GUI)
 
-2. **Run C++ Simulation Engine across oven configurations**:
-   ```bash
-   .\simulation_engine.exe --manifest manifest.json --overwrite
-   ```
+```bash
+python run_pipeline.py
+```
 
-3. **Analyze simulation outputs vs. theoretical $M/M/c/m$ model**:
-   ```bash
-   python pizzeria_python_test/analyzer.py
-   ```
+# Start automaticly through console
 
-4. **Generate comparative plots**:
-   ```bash
-   python pizzeria_python_test/visualizer.py
-   ```
+```bash
+python run_pipeline.py --orders 500 --seed 10 --ovens 2 3 4 5 6 7 8 9 10 --auto
+```
 
 ### Experimental Results & Validation
 
