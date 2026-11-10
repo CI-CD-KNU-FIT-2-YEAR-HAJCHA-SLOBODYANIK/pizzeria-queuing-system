@@ -1,90 +1,87 @@
-# Pizzeria Queuing System Optimization & Active Ovens Management
+## Ролі та структура команди
 
-**Course**: Computer Modeling of Processes (3rd Year, Semester 1)
-**Topic**: Option 4 – Discrete-event & Analytical Queueing Modeling of a Pizzeria Baking Line with Dynamic Oven Management ($M/M/c/m$).
-**Operating Hours**: 09:00 – 22:00 (780 minutes / 13 hours total, time step $\Delta t = 1\text{ sec}$).
+- **Роль 1 (Розробник симуляційного движка)**: C++ дискретно-подієве ядро симуляційного движка (`simulation_engine/`).
+- **Роль 2 (Моделювальник симуляцій та аналітик даних)**: Проведення експериментів, калібрування параметрів, генерація набору даних (`generator.py`), аналіз вихідних JSON-звітів (`analyzer.py`), побудова порівняльних графіків (`visualizer.py`) та запуск експериментів Монте-Карло.
+- **Роль 3 (Теоретичний моделювальник та технічний письменник)**: Аналітичний розв'язувач СМО $M/M/c/m$ на основі теорії масового обслуговування, математичні формулювання стаціонарних станів, економічна модель та документація.
 
----
+## Аналіз даних та пайплайн симуляції (Роль 2)
 
-## Team Roles & Structure
+Роль 2 надає повний Python-пакет автоматизації для генерації синтетичного навантаження, автоматичного парсингу вихідних звітів, верифікації на відповідність теоретичним моделям та візуалізації.
 
-- **Role 1 (Simulation Engine Developer)**: C++ discrete-event core simulation engine (`simulation_engine/`).
-- **Role 2 (Simulation Modeler & Data Analyst)**: Experimentation, parameter calibration, dataset generation (`generator.py`), output JSON analysis (`analyzer.py`), comparative graphs (`visualizer.py`), and Monte Carlo runs.
-- **Role 3 (Theoretical Modeler & Technical Writer)**: Analytical $M/M/c/m$ queueing theory solver, steady-state mathematical formulations, financial model, and documentation.
+### Швидкий старт (Python-пайплайн)
 
----
-
-## Data Analysis & Simulation Pipeline (Role 2)
-
-Role 2 provides a complete Python automation suite for synthetic workload generation, automated output report parsing, verification against theoretical models, and visualization.
-
-### Quick Start (Python Pipeline)
-
-# Start through graphical interface (GUI)
+# Запуск через графічний інтерфейс (GUI)
 
 ```bash
 python run_pipeline.py
 ```
 
-# Start automaticly through console
+# Автоматичний запуск через консоль
 
 ```bash
 python run_pipeline.py --orders 500 --seed 10 --ovens 2 3 4 5 6 7 8 9 10 --auto
 ```
 
-### Experimental Results & Validation
+### Експериментальні результати та валідація
 
-Empirical evaluation of 5 oven configurations (2, 3, 4, 7, and 9 active ovens) under a simulated workload of 100 orders:
+Емпірична оцінка 5 конфігурацій печей (2, 3, 4, 7 та 9 активних печей) за симульованого навантаження у 100 замовлень:
 
-| Run ID | Active Ovens ($c$) | Sim $P_{\text{loss}}$ (%) | Theory $P_{\text{loss}}$ (%) | Sim Wait Time (min) | Net Profit (UAH) |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| `run_2_ovens` | 2 | 35.0% | 0.21% | 39.60 | 10 905.84 |
-| `run_3_ovens` | 3 | 20.0% | 0.00% | 36.20 | 14 344.01 |
-| `run_4_ovens` | 4 | 10.0% | 0.00% | 32.37 | 16 069.95 |
-| **`run_7_ovens`** | **7** | **1.0%** | **0.00%** | **27.20** | **16 734.16** |
-| `run_9_ovens` | 9 | 1.0% | 0.00% | 26.28 | 15 947.32 |
+| Run ID            | Active Ovens ($c$) | Sim $P_{\text{loss}}$ (%) | Theory $P_{\text{loss}}$ (%) | Sim Wait Time (min) | Net Profit (UAH) |
+| :---------------- | :----------------: | :-----------------------: | :--------------------------: | :-----------------: | :--------------: |
+| `run_2_ovens`     |         2          |           35.0%           |            0.21%             |        39.60        |    10 905.84     |
+| `run_3_ovens`     |         3          |           20.0%           |            0.00%             |        36.20        |    14 344.01     |
+| `run_4_ovens`     |         4          |           10.0%           |            0.00%             |        32.37        |    16 069.95     |
+| **`run_7_ovens`** |       **7**        |         **1.0%**          |          **0.00%**           |      **27.20**      |  **16 734.16**   |
+| `run_9_ovens`     |         9          |           1.0%            |            0.00%             |        26.28        |    15 947.32     |
 
-**Generated Visualization Artifacts:**
-- **Net Profit Curve**: `images/profit_vs_ovens.png`
-- **Loss Rate Comparison**: `images/p_loss_comparison.png`
+**Згенеровані артефакти візуалізації:**
+
+- **Крива чистого прибутку**: `images/profit_vs_ovens.png`
+- **Порівняння рівня відмов**: `images/p_loss_comparison.png`
 
 ---
 
-## Analytical Queueing Module ($M/M/c/m$)
+## Модуль аналітичної СМО ($M/M/c/m$)
 
-The analytical module calculates exact steady-state state probabilities and performance metrics for multi-server queueing systems with finite buffers ($c \le 10$ active ovens, queue capacity $m = 10$):
-- **Idle Probability ($P_0$)** and State Distribution ($P_k$)
-- **Loss / Rejection Probability ($P_{reject} = P_{c+m}$)**
-- **Relative Throughput ($Q$)** and **Absolute Throughput ($A$)**
-- **Average Busy Ovens ($L_s$)** and **Oven Utilization ($\eta$)**
-- **Average Queue Length ($L_q$)** and **Queue Wait Time ($W_q$)**
-- **Economic Evaluation**: Gross revenue, oven operational costs (active vs. idle power), lost customer penalties, and net profit.
+Аналітичний модуль обчислює точні ймовірності стаціонарних станів та метрики ефективності для багатоканальних систем масового обслуговування з обмеженим буфером ($c \le 10$ активних печей, місткість черги $m = 10$):
 
-### Quick Start (Python)
+- **Ймовірність простою ($P_0$)** та розподіл станів ($P_k$)
+- **Ймовірність відмови / відхилення ($P_{reject} = P_{c+m}$)**
+- **Відносна пропускна здатність ($Q$)** та **Абсолютна пропускна здатність ($A$)**
+- **Середня кількість зайнятих печей ($L_s$)** та **Коефіцієнт використання печей ($\eta$)**
+- **Середня довжина черги ($L_q$)** and **Час очікування в черзі ($W_q$)**
+- **Економічна оцінка**: Валовий дохід, операційні витрати на печі (активна потужність проти простою), штрафи за втрачених клієнтів та чистий прибуток.
 
-Run the full 780-minute operating day analytical evaluation:
+### Швидкий старт (Python)
+
+Запуск повного аналітичного розрахунку для 780-хвилинного робочого дня:
+
 ```bash
 python -m analytical.cli --benchmark
 ```
 
-Run a single-shift evaluation:
+Запуск розрахунку для однієї зміни:
+
 ```bash
 python -m analytical.cli --single --c 5 --m 10 --lambda-rate 30.0 --mu-rate 6.0
 ```
 
-Find the optimal number of active ovens $c^*$ for a given traffic intensity:
+Пошук оптимальної кількості активних печей $c^*$ для заданої інтенсивності потоку:
+
 ```bash
 python -m analytical.cli --optimize --lambda-rate 36.0 --mu-rate 6.0
 ```
 
-Export theoretical benchmark data to CSV:
+Експорт теоретичних еталонних даних у CSV:
+
 ```bash
 python -m analytical.cli --export-csv "analytical_benchmark.csv"
 ```
 
-### Quick Start (C++)
+### Швидкий старт (C++)
 
-Role 1 and 2 can also directly include the analytical solver header in C++:
+Учасники 1 та 2 можуть також безпосередньо підключати заголовочний файл аналітичного розв'язувача у C++:
+
 ```cpp
 #include "analytical_solver.hpp"
 
@@ -94,16 +91,17 @@ auto metrics = solver.solve(36.0, 6.0); // lambda = 36.0, mu = 6.0
 
 ---
 
-## Documentation
+## Документація
 
-- [Mathematical Model Specification](docs/THEORETICAL_MODEL.md): Complete derivations, Kolmogorov state equations, closed-form formulas, and Mermaid Markov diagrams.
-- [Metrics Comparison & Validation Guide](docs/METRICS_COMPARISON_GUIDE.md): Mapping table between analytical metrics and simulation estimators for Participant 2.
+- [Специфікація математичної моделі](docs/THEORETICAL_MODEL.md): Повні виведення, рівняння станів Колмогорова, формули у замкненій формі та Марковські діаграми Mermaid.
+- [Посібник з порівняння та валідації метрик](docs/METRICS_COMPARISON_GUIDE.md): Таблиця відповідності між аналітичними метриками та оцінками симулятора для Учасника 2.
 
 ---
 
-## Testing
+## Тестування
 
-Run unit tests:
+Запуск юніт-тестів:
+
 ```bash
 python -m pytest tests/ -v
 ```
