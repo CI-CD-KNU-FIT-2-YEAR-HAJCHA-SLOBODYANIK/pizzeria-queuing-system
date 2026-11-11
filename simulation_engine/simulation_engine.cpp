@@ -188,6 +188,11 @@ public:
     const RunSummary& summary() const { return run_summary; }
     const Logger& logs() const { return logger; }
 
+    // Додає до журналу підсумкову діагностику використання пам'яті QueueManager.
+    void log_queue_memory_usage() {
+        queue_manager.log_memory_usage(logger, std::min(next_sec, SECONDS_PER_DAY), IssueSeverity::Info);
+    }
+
 private:
     PizzeriaConfig config;
     const std::vector<PizzaRecipe>& recipes; // Спільна таблиця рецептів; SimulationEngine не володіє її пам'яттю.
@@ -736,7 +741,11 @@ private:
         const DynamicOvenPolicyEntry* policy = dynamic_policy_at(time);
         if (!policy) return baseline;
         const int load = est_queue_load(time);
-        if (policy->new_oven_trigger_sec > 0 &&
+        // Нову додаткову піч можна запускати лише після завершення поточного нагрівання.
+        const bool heating_in_progress = std::any_of(oven_storage.begin(), oven_storage.end(),
+            [](const OvenSlotGroupRuntime& oven) { return oven.state == OvenState::HeatingUp; });
+        if (!heating_in_progress &&
+            policy->new_oven_trigger_sec > 0 &&
             policy->new_oven_trigger_sec < SECONDS_PER_DAY &&
             load >= policy->new_oven_trigger_sec &&
             baseline + dynamic_extra_ovens < max_ovens &&
@@ -744,7 +753,8 @@ private:
             ++dynamic_extra_ovens;
             last_dynamic_increase_sec = time;
             dynamic_hold_until_sec = time + std::max(0, policy->new_oven_loyal_sec);
-            next_stream_action_sec = time + 1;
+            // За ненульового нагрівання наступну перевірку викличе подія його завершення.
+            if (config.heat_up_sec == 0) next_stream_action_sec = time + 1;
         }
         else if (dynamic_extra_ovens > 0) {
             if (policy->new_oven_sustain_sec > 0 &&

@@ -156,8 +156,15 @@ namespace {
     }
 
     J normalized_queue(const QueueConfig& q) {
+        const char* mode = "bounded";
+        switch (q.mode) {
+        case QueueSearchMode::Fast: mode = "fast"; break;
+        case QueueSearchMode::Bounded: mode = "bounded"; break;
+        case QueueSearchMode::LiteBrute: mode = "lite-brute"; break;
+        case QueueSearchMode::EnclaveTree: mode = "enclave-tree"; break;
+        }
         return Obj{
-            {"mode", q.mode == QueueSearchMode::Fast ? "fast" : "bounded"},
+            {"mode", mode},
             {"max_search_nodes", q.max_search_nodes},
             {"max_repack_nodes", q.max_repack_nodes},
             {"max_branch_per_task", q.max_branch_per_task},

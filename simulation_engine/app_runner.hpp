@@ -169,6 +169,8 @@ namespace {
                 const bool failed = engine.has_fatal_error();
                 const JobState final_state = cancelled ? JobState::Cancelled :
                     failed ? JobState::Failed : JobState::Completed;
+                // Зберігаємо діагностику черги один раз після завершення або зупинки запуску.
+                engine.log_queue_memory_usage();
                 write_report(project, job, engine.logs(), state_name(final_state),
                     failed ? engine.last_error() : "", overwrite);
                 job.state = final_state;
