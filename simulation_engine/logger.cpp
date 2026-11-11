@@ -129,7 +129,7 @@ namespace {
     }
 } // namespace
 
-// Записывает полный отчёт потоково: память не удваивается при большом количестве заказов.
+// Записує повний звіт потоково: використання пам'яті не подвоюється за великої кількості замовлень.
 void Logger::write_json(std::ostream& out, bool include_oven_events) const {
     out << "{\"summary\":";
     out << summary_json(summary);
