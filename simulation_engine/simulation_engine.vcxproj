@@ -152,6 +152,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="app_config.hpp" />
+    <ClInclude Include="app_data.hpp" />
+    <ClInclude Include="app_project.hpp" />
+    <ClInclude Include="app_runner.hpp" />
     <ClInclude Include="logger.hpp" />
     <ClInclude Include="queue_engine.hpp" />
     <ClInclude Include="queue_manager.hpp" />
