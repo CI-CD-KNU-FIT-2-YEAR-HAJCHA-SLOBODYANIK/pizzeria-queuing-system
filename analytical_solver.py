@@ -1,19 +1,3 @@
-"""Standalone Analytical M/M/c/m Queueing Theory Solver for Pizzeria Optimization.
-
-Course: Computer Modeling of Processes (University Project, Option 4)
-Role: Role 3 (Theoretical Modeler & Technical Writer)
-Language: English
-
-System Description:
-    - Multi-channel queueing system with finite buffer: M/M/c/m
-    - Parallel active ovens: c in [1, 10]
-    - Queue capacity: m = 10
-    - System capacity: K = c + m (orders in baking + orders waiting)
-    - Operating hours: 09:00 - 22:00 (780 minutes / 13 hours total, dt = 5 min)
-    - Markovian arrival process: Poisson with arrival rate lambda (orders/hour)
-    - Markovian service process: Exponential with service rate mu (pizzas/hour per oven)
-"""
-
 from __future__ import annotations
 import math
 import sys
