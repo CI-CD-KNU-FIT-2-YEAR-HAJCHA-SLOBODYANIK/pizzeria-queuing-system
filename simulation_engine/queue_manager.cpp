@@ -43,6 +43,8 @@ bool QueueManager::set_config(const QueueConfig& cfg) {
     drop_variants();
     last_search_peak_bytes_ = last_search_nodes_ = last_search_enclaves_ = 0;
     last_search_limit_hit_ = false;
+    memory_peak_ = {};
+    if (memory_peak_tracking_) observe_memory_peak(0);
     return true;
 }
 
@@ -53,6 +55,7 @@ bool QueueManager::configure_streams(int total_streams, int initially_enabled) {
     for (int i = 0; i < initially_enabled; ++i) stream_accepting_[i] = 1;
     ovens_count = initially_enabled;
     drop_variants();
+    observe_memory_peak(0);
     return true;
 }
 
@@ -98,6 +101,7 @@ bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int curr_time_
     last_search_nodes_ = diagnostics.nodes_expanded;
     last_search_enclaves_ = diagnostics.enclaves_created;
     last_search_limit_hit_ = diagnostics.budget_exhausted;
+    observe_memory_peak(curr_time_clear_sec, &diagnostics);
     if (!found || !validate_current(output, enabled)) return false;
     // Вимкнений потік не містить інших задач, окрім збереженої задачі, що виконується.
     for (const auto& t : output)
@@ -106,6 +110,7 @@ bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int curr_time_
     current_queue = std::move(output);
     stream_accepting_ = std::move(enabled);
     --ovens_count;
+    observe_memory_peak(curr_time_clear_sec);
     drop_variants();
     return true;
 }
@@ -142,6 +147,7 @@ bool QueueManager::compress(int target, int curr_time_clear_sec, bool apply) {
             last_search_nodes_ = diag.nodes_expanded;
             last_search_enclaves_ = diag.enclaves_created;
             last_search_limit_hit_ = diag.budget_exhausted;
+            observe_memory_peak(curr_time_clear_sec, &diag);
             if (!found || !validate_current(repacked, proposed_flags)) continue;
             candidate = std::move(repacked);
             enabled = std::move(proposed_flags);
@@ -154,6 +160,7 @@ bool QueueManager::compress(int target, int curr_time_clear_sec, bool apply) {
     current_queue = std::move(candidate);
     stream_accepting_ = std::move(enabled);
     ovens_count = target;
+    observe_memory_peak(curr_time_clear_sec);
     drop_variants();
     return true;
 }
@@ -229,10 +236,12 @@ std::pair<int, int> QueueManager::put_impl(const Variant* base, int target_sec,
     last_search_nodes_ = solutions.diagnostics.nodes_expanded;
     last_search_enclaves_ = solutions.diagnostics.enclaves_created;
     last_search_limit_hit_ = solutions.search_limit_hit;
+    observe_memory_peak(current_sec, &solutions.diagnostics);
     int left_end = -1, right_end = -1;
     if (solutions.left.found) {
         left_end = solutions.left.start_sec + duration_sec;
         left_id = add_variant(solutions.left.tasks, base->pending_count + 1);
+        observe_memory_peak(current_sec);
         if (left_id < 0) left_end = -1;
     }
     if (solutions.right.found) {
@@ -240,6 +249,7 @@ std::pair<int, int> QueueManager::put_impl(const Variant* base, int target_sec,
         right_id = add_variant(solutions.right.tasks, base->pending_count + 1);
         if (right_id < 0) right_end = -1;
     }
+    observe_memory_peak(current_sec);
     return { left_end, right_end };
 }
 
@@ -311,6 +321,7 @@ bool QueueManager::apply_variant_items(int id,
     if (!validate_current(candidate, stream_accepting_)) return false;
     sort_queue(candidate);
     current_queue = std::move(candidate);
+    observe_memory_peak(current_sec);
     drop_variants();
     return true;
 }
@@ -377,6 +388,36 @@ int QueueManager::next_event(int current_sec, QueueEvent& out_event) {
     }
     return best == INT_MAX ? -1 : best - current_sec;
 }
+void QueueManager::set_memory_peak_tracking(bool enabled) {
+    memory_peak_tracking_ = enabled;
+    memory_peak_ = {};
+    if (enabled) observe_memory_peak(0);
+}
+
+void QueueManager::observe_memory_peak(int time_sec, const EngineDiagnostics* diagnostics) {
+    if (!memory_peak_tracking_) return;
+
+    const QueueMemoryUsage current = memory_usage();
+    memory_peak_.manager_peak_bytes = std::max(memory_peak_.manager_peak_bytes, current.current_bytes);
+    memory_peak_.max_queue_tasks = std::max(memory_peak_.max_queue_tasks, uint64_t(current_queue.size()));
+
+    // Оцінюємо пам'ять менеджера й тимчасову пам'ять саме цього пошуку разом.
+    const uint64_t search_bytes = diagnostics ? diagnostics->peak_bytes : 0;
+    if (diagnostics) {
+        ++memory_peak_.searches_observed;
+        memory_peak_.search_peak_bytes = std::max(memory_peak_.search_peak_bytes, search_bytes);
+    }
+    const uint64_t estimated_bytes = current.current_bytes + search_bytes;
+    if (estimated_bytes > memory_peak_.estimated_peak_bytes) {
+        memory_peak_.estimated_peak_bytes = estimated_bytes;
+        memory_peak_.peak_time_sec = time_sec;
+        memory_peak_.queue_tasks_at_peak = current_queue.size();
+        memory_peak_.nodes_at_peak = diagnostics ? diagnostics->nodes_expanded : 0;
+        memory_peak_.enclaves_at_peak = diagnostics ? diagnostics->enclaves_created : 0;
+        memory_peak_.budget_exhausted_at_peak = diagnostics && diagnostics->budget_exhausted;
+    }
+}
+
 QueueMemoryUsage QueueManager::memory_usage() const {
     QueueMemoryUsage m;
     m.mode = config_.mode;

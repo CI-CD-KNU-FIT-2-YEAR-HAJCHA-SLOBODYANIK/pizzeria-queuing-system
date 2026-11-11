@@ -188,6 +188,13 @@ public:
     const RunSummary& summary() const { return run_summary; }
     const Logger& logs() const { return logger; }
 
+    // Збір піка вмикається для кожного запуску окремо.
+    void set_queue_memory_peak_tracking(bool enabled) {
+        queue_manager.set_memory_peak_tracking(enabled);
+    }
+
+    QueueMemoryPeak queue_memory_peak() const { return queue_manager.memory_peak(); }
+
     // Додає до журналу підсумкову діагностику використання пам'яті QueueManager.
     void log_queue_memory_usage() {
         queue_manager.log_memory_usage(logger, std::min(next_sec, SECONDS_PER_DAY), IssueSeverity::Info);

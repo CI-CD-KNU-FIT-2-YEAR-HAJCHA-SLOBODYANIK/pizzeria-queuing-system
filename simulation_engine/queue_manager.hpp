@@ -65,6 +65,22 @@ struct QueueMemoryUsage {
     QueueSearchMode mode = QueueSearchMode::Fast;
 };
 
+// Пікові оцінки пам'яті за весь запуск, а не лише за останній пошук.
+struct EngineDiagnostics;
+
+struct QueueMemoryPeak {
+    uint64_t estimated_peak_bytes = 0;
+    uint64_t manager_peak_bytes = 0;
+    uint64_t search_peak_bytes = 0;
+    uint64_t searches_observed = 0;
+    uint32_t nodes_at_peak = 0;
+    uint32_t enclaves_at_peak = 0;
+    int peak_time_sec = -1;
+    uint64_t queue_tasks_at_peak = 0;
+    uint64_t max_queue_tasks = 0;
+    bool budget_exhausted_at_peak = false;
+};
+
 class QueueManager {
 public:
     int ovens_count = 1;
@@ -99,6 +115,10 @@ public:
 
     // Оцінка виконується лише за зовнішнім запитом, а не на кожному кроці планувальника.
     QueueMemoryUsage memory_usage() const;
+
+    // Збір вимкнено за замовчуванням; головна програма вмикає його за потреби.
+    void set_memory_peak_tracking(bool enabled);
+    QueueMemoryPeak memory_peak() const { return memory_peak_; }
     bool last_search_limit_hit() const { return last_search_limit_hit_; }
 
     // Шаблон використовує наявний метод logger.log_issue без залежності від Logger.
@@ -131,6 +151,10 @@ private:
     uint32_t last_search_nodes_ = 0;
     uint32_t last_search_enclaves_ = 0;
     bool last_search_limit_hit_ = false;
+    bool memory_peak_tracking_ = false;
+    QueueMemoryPeak memory_peak_;
+
+    void observe_memory_peak(int time_sec, const EngineDiagnostics* diagnostics = nullptr);
 
     bool apply_variant_items(int id, const std::vector<QueueTaskPlacement>& placements, int current_sec);
     void drop_variants();

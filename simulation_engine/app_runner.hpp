@@ -48,7 +48,8 @@ namespace {
 
     // Результати записуються потоково; готовий звіт замінює попередній через .tmp/.bak.
     void write_report(const Project& project, const Job& job, const Logger& logger,
-        const std::string& status, const std::string& failure, bool overwrite) {
+        const std::string& status, const std::string& failure, bool overwrite,
+        const QueueMemoryPeak* queue_memory_peak = nullptr) {
         const auto& run = *job.spec;
         fs::path temp = run.report_path;
         temp += ".tmp";
@@ -72,6 +73,23 @@ namespace {
                 << "},\"failure\":";
             if (failure.empty()) out << "null";
             else out << J(failure).dump();
+            // Структурована оцінка пікової пам'яті за весь запуск симуляції.
+            if (queue_memory_peak) {
+                const auto& m = *queue_memory_peak;
+                out << ",\"queue_memory_peak\":" << J(Obj{
+                    {"estimated_peak_bytes", m.estimated_peak_bytes},
+                    {"manager_peak_bytes", m.manager_peak_bytes},
+                    {"search_peak_bytes", m.search_peak_bytes},
+                    {"searches_observed", m.searches_observed},
+                    {"peak_time_sec", m.peak_time_sec},
+                    {"queue_tasks_at_peak", m.queue_tasks_at_peak},
+                    {"max_queue_tasks", m.max_queue_tasks},
+                    {"nodes_at_peak", m.nodes_at_peak},
+                    {"enclaves_at_peak", m.enclaves_at_peak},
+                    {"budget_exhausted_at_peak", m.budget_exhausted_at_peak},
+                    {"approximate", true}
+                    }).dump();
+            }
             out << ",\"results\":";
             logger.write_json(out, project.include_oven_events);
             out << "}\n";
@@ -104,13 +122,15 @@ namespace {
     struct Runner {
         Project project;
         bool overwrite;
+        bool report_queue_memory_peak;
         std::deque<Job> jobs;
         std::vector<std::thread> workers;
         std::atomic<std::size_t> next{ 0 };
         std::atomic<int> finished{ 0 };
         std::atomic<bool> stopped{ false };
 
-        Runner(Project p, bool replace) : project(std::move(p)), overwrite(replace) {
+        Runner(Project p, bool replace, bool report_memory)
+            : project(std::move(p)), overwrite(replace), report_queue_memory_peak(report_memory) {
             for (const auto& run : project.runs)
                 jobs.emplace_back(&run);
         }
@@ -149,6 +169,7 @@ namespace {
                 const RunSpec& run = *job.spec;
                 SimulationEngine engine(run.config, project.recipes, project.toppings,
                     run.max_ovens, run.tables_id_is_index, project.queue);
+                engine.set_queue_memory_peak_tracking(report_queue_memory_peak);
                 if (engine.has_fatal_error()) throw std::runtime_error(engine.last_error());
                 for (const auto& order : *run.orders) {
                     if (should_stop(job)) break;
@@ -169,10 +190,12 @@ namespace {
                 const bool failed = engine.has_fatal_error();
                 const JobState final_state = cancelled ? JobState::Cancelled :
                     failed ? JobState::Failed : JobState::Completed;
-                // Зберігаємо діагностику черги один раз після завершення або зупинки запуску.
-                engine.log_queue_memory_usage();
+                // Підсумкова діагностика останнього пошуку залишається в журналі.
+                if (report_queue_memory_peak) engine.log_queue_memory_usage();
+                const QueueMemoryPeak peak = engine.queue_memory_peak();
                 write_report(project, job, engine.logs(), state_name(final_state),
-                    failed ? engine.last_error() : "", overwrite);
+                    failed ? engine.last_error() : "", overwrite,
+                    report_queue_memory_peak ? &peak : nullptr);
                 job.state = final_state;
             }
             catch (const std::exception& e) {

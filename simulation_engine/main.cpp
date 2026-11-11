@@ -43,6 +43,9 @@ using Obj = J::object_t;
 #include "app_project.hpp"
 #include "app_runner.hpp"
 
+// Увімкнути вимірювання пікового використання пам'яті чергою в кожному запуску.
+constexpr bool kReportQueueMemoryPeak = true;
+
 int run_program(int argc, char** argv) {
     std::signal(SIGINT, on_interrupt);
 #ifdef SIGTERM
@@ -50,7 +53,7 @@ int run_program(int argc, char** argv) {
 #endif
     try {
         const CLI cli = parse_cli(argc, argv);
-        Runner runner(load_project(cli), cli.overwrite);
+        Runner runner(load_project(cli), cli.overwrite, kReportQueueMemoryPeak);
         emit(Obj{
             {"event", "ready"},
             {"total", runner.jobs.size()},
