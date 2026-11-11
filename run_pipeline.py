@@ -61,7 +61,7 @@ class PizzeriaPipelineGUI:
         ttk.Label(param_frame, text="Режим черги:").grid(row=1, column=2, sticky="w", padx=5, pady=5)
         self.combo_queue = ttk.Combobox(
             param_frame,
-            values=["bounded", "fast", "lite_brute", "enclave_tree"],
+            values=["bounded", "fast", "lite-brute", "enclave-tree"],
             state="readonly",
             width=13
         )
