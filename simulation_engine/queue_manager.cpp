@@ -41,6 +41,8 @@ bool QueueManager::set_config(const QueueConfig& cfg) {
     if (config_.max_branch_per_task < 1) config_.max_branch_per_task = 1;
     if (config_.max_time_sec <= 0) config_.max_time_sec = SECONDS_PER_DAY;
     drop_variants();
+    last_search_peak_bytes_ = last_search_nodes_ = last_search_enclaves_ = 0;
+    last_search_limit_hit_ = false;
     return true;
 }
 
@@ -89,8 +91,14 @@ bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int curr_time_
     auto enabled = stream_accepting_;
     enabled[stream_id] = 0;
     std::vector<QueueTaskItem> output;
-    if (!QueueEngine::repack(current_queue, enabled, stream_id, keep_task_id,
-        config_, output, curr_time_clear_sec) || !validate_current(output, enabled)) return false;
+    EngineDiagnostics diagnostics;
+    const bool found = QueueEngine::repack(current_queue, enabled, stream_id, keep_task_id,
+        config_, output, curr_time_clear_sec, &diagnostics);
+    last_search_peak_bytes_ = diagnostics.peak_bytes;
+    last_search_nodes_ = diagnostics.nodes_expanded;
+    last_search_enclaves_ = diagnostics.enclaves_created;
+    last_search_limit_hit_ = diagnostics.budget_exhausted;
+    if (!found || !validate_current(output, enabled)) return false;
     // Выключенный поток не содержит иных задач, кроме сохранённой выполняющейся.
     for (const auto& t : output)
         if (t.stream_id == stream_id && t.task_id != keep_task_id) return false;
@@ -127,8 +135,14 @@ bool QueueManager::compress(int target, int curr_time_clear_sec, bool apply) {
             auto proposed_flags = enabled;
             proposed_flags[s] = 0;
             std::vector<QueueTaskItem> repacked;
-            if (!QueueEngine::repack(candidate, proposed_flags, s, keep,
-                config_, repacked, curr_time_clear_sec) || !validate_current(repacked, proposed_flags)) continue;
+            EngineDiagnostics diag;
+            const bool found = QueueEngine::repack(candidate, proposed_flags, s, keep,
+                config_, repacked, curr_time_clear_sec, &diag);
+            last_search_peak_bytes_ = diag.peak_bytes;
+            last_search_nodes_ = diag.nodes_expanded;
+            last_search_enclaves_ = diag.enclaves_created;
+            last_search_limit_hit_ = diag.budget_exhausted;
+            if (!found || !validate_current(repacked, proposed_flags)) continue;
             candidate = std::move(repacked);
             enabled = std::move(proposed_flags);
             --count;
@@ -176,7 +190,10 @@ bool QueueManager::shift_stream_left(int stream_id, int seconds, int curr_time_c
     return true;
 }
 
-void QueueManager::drop_variants() { queue_variants_.clear(); }
+void QueueManager::drop_variants() {
+    std::deque<Variant> empty;
+    queue_variants_.swap(empty); // Освобождаем даже оставшиеся блоки deque.
+}
 
 const QueueManager::Variant* QueueManager::variant_at(int id) const {
     if (id < 0) return nullptr;
@@ -202,12 +219,16 @@ std::pair<int, int> QueueManager::put_impl(const Variant* base, int target_sec,
     int duration_sec, int& left_id, int& right_id, int min_sec, int max_sec,
     int current_sec) {
     left_id = right_id = -1;
-    if (!base || duration_sec <= 0 || min_sec < current_sec || current_sec < 0 ||
+    if (!base || duration_sec <= 0 || current_sec < 0 || min_sec < 0 ||
         max_sec > config_.max_time_sec ||
         min_sec >= max_sec || base->pending_count >= INT_MAX - 1) return { -1, -1 };
     const int new_id = -(base->pending_count + 1);
     const auto solutions = QueueEngine::insert(base->items, stream_accepting_,
         target_sec, duration_sec, new_id, min_sec, max_sec, config_, current_sec);
+    last_search_peak_bytes_ = solutions.diagnostics.peak_bytes;
+    last_search_nodes_ = solutions.diagnostics.nodes_expanded;
+    last_search_enclaves_ = solutions.diagnostics.enclaves_created;
+    last_search_limit_hit_ = solutions.search_limit_hit;
     int left_end = -1, right_end = -1;
     if (solutions.left.found) {
         left_end = solutions.left.start_sec + duration_sec;
@@ -355,4 +376,22 @@ int QueueManager::next_event(int current_sec, QueueEvent& out_event) {
         }
     }
     return best == INT_MAX ? -1 : best - current_sec;
+}
+QueueMemoryUsage QueueManager::memory_usage() const {
+    QueueMemoryUsage m;
+    m.mode = config_.mode;
+    m.current_bytes = sizeof(*this);
+    m.current_bytes += uint64_t(current_queue.capacity()) * sizeof(QueueTaskItem);
+    m.current_bytes += uint64_t(stream_accepting_.capacity()) * sizeof(uint8_t);
+    // У deque есть блоки и служебные указатели. Оценка намеренно приближённая.
+    m.current_bytes += uint64_t(queue_variants_.size()) *
+        (sizeof(Variant) + sizeof(void*) * 3);
+    for (const Variant& v : queue_variants_)
+        m.current_bytes += uint64_t(v.items.capacity()) * sizeof(QueueTaskItem);
+    m.last_search_peak_bytes = last_search_peak_bytes_;
+    m.last_search_nodes = last_search_nodes_;
+    m.last_search_enclaves = last_search_enclaves_;
+    m.search_limit_hit = last_search_limit_hit_;
+    m.estimated_peak_bytes = m.current_bytes + m.last_search_peak_bytes;
+    return m;
 }
