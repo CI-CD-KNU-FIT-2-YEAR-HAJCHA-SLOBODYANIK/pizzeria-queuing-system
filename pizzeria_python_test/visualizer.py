@@ -1,34 +1,35 @@
 """
 Модуль візуалізації результатів.
-Будує та зберігає графіки залежності прибутку від кількості печей та порівняння з теорією.
+Будує та зберігає графіки на основі агрегованих даних Монте-Карло.
 """
 
 from pathlib import Path
 import matplotlib.pyplot as plt
-from analyzer import analyze_run_vs_theory
+from analyzer import analyze_all_reports
 
 
 def plot_results(output_dir: Path, save_dir: Path = Path("images")) -> None:
-    """Будує та зберігає графіки аналізу."""
     save_dir.mkdir(parents=True, exist_ok=True)
-    json_files = list(output_dir.glob("*.json"))
 
-    if not json_files:
-        print("Немає JSON-звітів для візуалізації.")
+    if not output_dir.exists():
+        print("Папка з результатами відсутня.")
         return
 
-    data = [analyze_run_vs_theory(f) for f in json_files]
-    data.sort(key=lambda x: x["active_ovens"])
+    data = analyze_all_reports(output_dir)
+
+    if not data:
+        print("Немає даних для візуалізації.")
+        return
 
     ovens = [d["active_ovens"] for d in data]
-    profits = [d["simulation"]["profit_uah"] for d in data]
-    sim_p_loss = [d["simulation"]["p_loss_percent"] for d in data]
-    theory_p_loss = [d["theory"]["p_loss_percent"] for d in data]
+    profits = [d["avg_profit"] for d in data]
+    sim_p_loss = [d["avg_p_loss"] for d in data]
+    theory_p_loss = [d["theory_p_loss"] for d in data]
 
-    # 1. Графік: Чистий прибуток vs Кількість печей
+    # 1. Графік прибутку
     plt.figure(figsize=(8, 5))
-    plt.plot(ovens, profits, marker='o', color='b', linewidth=2, label='Чистий прибуток (грн)')
-    plt.title('Залежність чистого прибутку від кількості активних печей')
+    plt.plot(ovens, profits, marker='o', color='b', linewidth=2, label='Сер. прибуток (грн, MC)')
+    plt.title('Залежність чистого прибутку від кількості активних печей (Монте-Карло)')
     plt.xlabel('Кількість печей')
     plt.ylabel('Прибуток (грн)')
     plt.grid(True, linestyle='--', alpha=0.7)
@@ -37,9 +38,9 @@ def plot_results(output_dir: Path, save_dir: Path = Path("images")) -> None:
     plt.savefig(save_dir / "profit_vs_ovens.png", dpi=300)
     plt.close()
 
-    # 2. Графік: Порівняння % відмов (Імітація vs Теорія)
+    # 2. Графік % відмов
     plt.figure(figsize=(8, 5))
-    plt.plot(ovens, sim_p_loss, marker='s', color='r', linewidth=2, label='Імітація (% відмов)')
+    plt.plot(ovens, sim_p_loss, marker='s', color='r', linewidth=2, label='Імітація (% відмов, MC)')
     plt.plot(ovens, theory_p_loss, marker='^', color='g', linestyle='--', linewidth=2, label='Теорія (% відмов)')
     plt.title('Порівняння відсотка відмов: Імітація vs Теорія СМО')
     plt.xlabel('Кількість печей')

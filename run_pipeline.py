@@ -7,7 +7,6 @@ import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from pathlib import Path
 
-# Перевірка наявності Pillow для масштабування графіків
 try:
     from PIL import Image, ImageTk
     HAS_PIL = True
@@ -32,17 +31,15 @@ class PizzeriaPipelineGUI:
         self.root.bind("<Configure>", self._on_resize)
 
     def _create_widgets(self):
-        # 1. Секція вводу параметрів
         param_frame = ttk.LabelFrame(self.root, text=" Параметри експерименту ", padding=10)
         param_frame.pack(fill="x", padx=15, pady=10)
 
-        # Рядок 0: Замовлення, Seed, Печі
         ttk.Label(param_frame, text="Замовлення:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.ent_orders = ttk.Entry(param_frame, width=8)
         self.ent_orders.insert(0, "500")
         self.ent_orders.grid(row=0, column=1, padx=5, pady=5)
 
-        ttk.Label(param_frame, text="Seed:").grid(row=0, column=2, sticky="w", padx=5, pady=5)
+        ttk.Label(param_frame, text="Base Seed:").grid(row=0, column=2, sticky="w", padx=5, pady=5)
         self.ent_seed = ttk.Entry(param_frame, width=8)
         self.ent_seed.insert(0, "10")
         self.ent_seed.grid(row=0, column=3, padx=5, pady=5)
@@ -52,10 +49,9 @@ class PizzeriaPipelineGUI:
         self.ent_ovens.insert(0, "2 3 4 5 6 7 8 9 10")
         self.ent_ovens.grid(row=0, column=5, padx=5, pady=5)
 
-        # Рядок 1: Потоки, Режим черги, Кнопка запуску
         ttk.Label(param_frame, text="Потоки:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.ent_threads = ttk.Entry(param_frame, width=8)
-        self.ent_threads.insert(0, "4")
+        self.ent_threads.insert(0, "8")
         self.ent_threads.grid(row=1, column=1, padx=5, pady=5)
 
         ttk.Label(param_frame, text="Режим черги:").grid(row=1, column=2, sticky="w", padx=5, pady=5)
@@ -71,7 +67,6 @@ class PizzeriaPipelineGUI:
         self.btn_run = ttk.Button(param_frame, text="Запустити пайплайн", command=self.start_pipeline_thread)
         self.btn_run.grid(row=1, column=4, columnspan=2, padx=15, pady=5, sticky="ew")
 
-        # 2. Індикатор прогресу та логи Учасника 1
         progress_frame = ttk.Frame(self.root, padding=10)
         progress_frame.pack(fill="x", padx=15)
 
@@ -92,24 +87,20 @@ class PizzeriaPipelineGUI:
         self.progress_bar = ttk.Progressbar(progress_frame, mode="determinate", maximum=100)
         self.progress_bar.pack(fill="x")
 
-        # 3. Вкладки (Логи / Графіки)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=15, pady=10)
 
-        # Вкладка 1: Консоль логів
         tab_logs = ttk.Frame(self.notebook)
         self.notebook.add(tab_logs, text="Консоль та Звіти")
 
         self.txt_log = scrolledtext.ScrolledText(tab_logs, wrap=tk.WORD, font=("Consolas", 9), bg="#1e1e1e", fg="#d4d4d4")
         self.txt_log.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Вкладка 2: Графік Прибутку
         self.tab_profit = ttk.Frame(self.notebook)
         self.notebook.add(self.tab_profit, text="Прибуток")
         self.lbl_img_profit = ttk.Label(self.tab_profit, text="Запустіть симуляцію для генерації графіків", anchor="center")
         self.lbl_img_profit.pack(fill="both", expand=True)
 
-        # Вкладка 3: Графік Відмов
         self.tab_loss = ttk.Frame(self.notebook)
         self.notebook.add(self.tab_loss, text="Відсоток відмов")
         self.lbl_img_loss = ttk.Label(self.tab_loss, text="Запустіть симуляцію для генерації графіків", anchor="center")
@@ -139,6 +130,17 @@ class PizzeriaPipelineGUI:
         self.root.after(0, _update)
 
     def build_manifest(self, oven_counts, parallelism, queue_mode):
+        """Побудова manifest.json з 10 унікальними джерелами замовлень на кожне число печей."""
+        runs_list = []
+        for c in oven_counts:
+            for seed_idx in range(1, 11):
+                runs_list.append({
+                    "id": f"run_{c}_ovens_mc_{seed_idx}",
+                    "max_ovens": c,
+                    "orders": f"pizzeria_python_test/data/orders_mc_{seed_idx}.jsonl",
+                    "config": {"static_policy": [{"time": 0, "target_ovens": c}]}
+                })
+
         return {
             "version": 1,
             "parallelism": parallelism,
@@ -157,7 +159,6 @@ class PizzeriaPipelineGUI:
             "shared": {
                 "recipes": "pizzeria_python_test/data/recipes.csv",
                 "toppings": "pizzeria_python_test/data/toppings.csv",
-                "orders": "pizzeria_python_test/data/orders.jsonl",
                 "config": {
                     "opening_time": 32400, "closing_time": 79200,
                     "ingredient_price_g": {"meat": 0.3, "dough": 0.05, "cheese": 0.2, "veg": 0.1, "seafood": 0.4},
@@ -167,7 +168,7 @@ class PizzeriaPipelineGUI:
                     "max_early_prep_sec": 1200, "soft_delay_limit_sec": 300, "dynamic_policy": []
                 }
             },
-            "runs": [{"id": f"run_{c}_ovens", "max_ovens": c, "config": {"static_policy": [{"time": 0, "target_ovens": c}]}} for c in oven_counts]
+            "runs": runs_list
         }
 
     def start_pipeline_thread(self):
@@ -201,24 +202,30 @@ class PizzeriaPipelineGUI:
                 except OSError:
                     pass
 
-            # 2. Генерація
-            self.set_status("Генерація замовлень...", 25)
-            self.log(f"[2/5] Генерація {orders_count} замовлень (seed: {seed_val})...")
-            gen_res = subprocess.run([sys.executable, "pizzeria_python_test/generator.py",
-                                      "--output", "pizzeria_python_test/data/orders.jsonl",
-                                      "--count", str(orders_count), "--seed", str(seed_val)],
-                                     capture_output=True, text=True)
-            if gen_res.stdout: self.log(gen_res.stdout)
+            # 2. Генерація 10 різних файлів замовлень з унікальними seed
+            total_mc_runs = len(oven_counts) * 10
+            self.set_status("Генерація унікальних джерел замовлень для Монте-Карло...", 20)
+            self.log(f"[2/5] Генерація 10 файлів замовлень з seeds {seed_val+1}..{seed_val+10}...")
+
+            for seed_idx in range(1, 11):
+                cur_seed = seed_val + seed_idx
+                out_orders = f"pizzeria_python_test/data/orders_mc_{seed_idx}.jsonl"
+                subprocess.run([
+                    sys.executable, "pizzeria_python_test/generator.py",
+                    "--output", out_orders,
+                    "--count", str(orders_count),
+                    "--seed", str(cur_seed)
+                ], capture_output=True, text=True)
 
             # 3. Маніфест
-            self.set_status("Збірка manifest.json...", 40)
-            self.log(f"[3/5] Створення manifest.json (потоки: {parallelism}, режим черги: {queue_mode})...")
+            self.set_status(f"Збірка manifest.json ({total_mc_runs} прогонів)...", 40)
+            self.log(f"[3/5] Створення manifest.json на {total_mc_runs} прогонів...")
             manifest_data = self.build_manifest(oven_counts, parallelism, queue_mode)
             with open("manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest_data, f, indent=2)
 
             # 4. Пошук та запуск C++ двигуна
-            self.set_status("Виконання C++ симуляції...", 60)
+            self.set_status("Виконання Монте-Карло симуляцій...", 60)
 
             possible_paths = [
                 Path("simulation_engine.exe"),
@@ -240,7 +247,7 @@ class PizzeriaPipelineGUI:
                     "Не знайдено simulation_engine.exe! Перевірте наявність файлу в корені або папці збірки."
                 )
 
-            self.log(f"[4/5] Запуск C++ двигуна ({engine_path}) для конфігурацій: {oven_counts}...")
+            self.log(f"[4/5] Запуск C++ двигуна ({engine_path}) для {total_mc_runs} симуляцій...")
             engine_cmd = [str(engine_path), "--manifest", "manifest.json", "--overwrite"]
 
             process = subprocess.Popen(engine_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace')
@@ -252,13 +259,12 @@ class PizzeriaPipelineGUI:
                     if data.get("event") == "finished":
                         self.log(f"  Прогін {data.get('run_id')} завершено.")
                 except json.JSONDecodeError:
-                    self.log(f"  [C++] {line_str}")
+                    pass
 
             process.wait()
             if process.returncode != 0:
                 self.log(f"  Увага: C++ двигун завершився з кодом {process.returncode}")
 
-            # Парсинг рекурсивно усіх JSON-звітів у папці output/
             green_cnt, yellow_cnt, red_cnt = 0, 0, 0
             json_files = list(out_dir.rglob("*.json"))
             for report_file in json_files:
@@ -271,25 +277,21 @@ class PizzeriaPipelineGUI:
                     for row in raw_notifs:
                         if not isinstance(row, dict): continue
                         sev = int(row.get("severity", 0))
-                        if sev == 1:
-                            green_cnt += 1
-                        elif sev == 2:
-                            yellow_cnt += 1
-                        elif sev == 3:
-                            red_cnt += 1
+                        if sev == 1: green_cnt += 1
+                        elif sev == 2: yellow_cnt += 1
+                        elif sev == 3: red_cnt += 1
                 except Exception:
                     pass
 
             self.update_log_counters(green_cnt, yellow_cnt, red_cnt)
-            self.log(f"\nЗнайдено JSON-звітів: {len(json_files)}")
-            self.log(f"Сповіщення з логів JSON: Зелені: {green_cnt} | Жовті: {yellow_cnt} | Червоні: {red_cnt}")
+            self.log(f"\nОбробка completed: {len(json_files)} звітів у папці output/")
 
             # 5. Аналіз та Візуалізація
             self.set_status("Аналіз результатів та генерація графіків...", 85)
-            self.log("\n[5/5] Виконання аналізу та побудова графіків...")
+            self.log("\n[5/5] Агрегація результатів Монте-Карло...")
 
             ana_res = subprocess.run([sys.executable, "pizzeria_python_test/analyzer.py"], capture_output=True, text=True)
-            if ana_res.stdout: self.log("\n--- ЗВІТ АНАЛІЗАТОРА ---\n" + ana_res.stdout)
+            if ana_res.stdout: self.log("\n--- ЗВІТ АНАЛІЗАТОРА (УСЕРЕДНЕНИЙ МІЖ ПРОГОНАМИ) ---\n" + ana_res.stdout)
             if ana_res.stderr: self.log(ana_res.stderr)
 
             subprocess.run([sys.executable, "pizzeria_python_test/visualizer.py"], capture_output=True, text=True)
