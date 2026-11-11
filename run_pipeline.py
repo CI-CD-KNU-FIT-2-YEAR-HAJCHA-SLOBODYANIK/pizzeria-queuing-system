@@ -222,8 +222,8 @@ class PizzeriaPipelineGUI:
 
             possible_paths = [
                 Path("simulation_engine.exe"),
-                Path("x64/Debug/simulation_engine.exe"),
                 Path("x64/Release/simulation_engine.exe"),
+                Path("x64/Debug/simulation_engine.exe"),
                 Path("build/simulation_engine.exe"),
                 Path("simulation_engine/x64/Debug/simulation_engine.exe"),
                 Path("out/build/x64-Debug/simulation_engine.exe")

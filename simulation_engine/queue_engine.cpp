@@ -13,7 +13,7 @@
 #include <utility>
 
 namespace {
-    struct Gap { int lo, hi; }; // Допустимые начала для задачи в свободном интервале
+    struct Gap { int lo, hi; }; // Допустимі моменти початку задачі у вільному інтервалі
 
     int clamp_int(int v, int lo, int hi) { return std::max(lo, std::min(v, hi)); }
 
@@ -114,8 +114,8 @@ namespace {
 
     struct CandidateMove { int start, stream; int64_t cost; };
 
-    // Генерирует только границы свободных интервалов и времена рядом с целью.
-    // Посекундный перебор всей смены не требуется.
+    // Генерує лише межі вільних інтервалів і часові точки поблизу цілі.
+    // Посекундний перебір усієї зміни не потрібен.
     std::vector<CandidateMove> choices(const std::vector<QueueTaskItem>& tasks,
         const std::vector<uint8_t>& enabled, int idx, int target, int probe_duration,
         int cap, int current_sec) {
@@ -182,7 +182,7 @@ namespace {
             if (fixed(tasks[i])) continue;
             const int a = tasks[i].start_time_sec;
             const int b = a + tasks[i].cooking_time_sec;
-            // Приоритет задач, пересекающих целевой интервал.
+            // Пріоритет мають задачі, які перетинають цільовий інтервал.
             const bool crossing = a < target + duration && target < b;
             const int64_t gap = crossing ? 0 : (b <= target ? target - b : a - (target + duration));
             entries.emplace_back(gap * 100000 + std::abs(int64_t(a) - target), i);
@@ -195,8 +195,8 @@ namespace {
 
     struct RepackItem { int index, slack, original_start; };
 
-    // Размещает интервалы с жёсткой фиксацией уже выполняющихся задач.
-    // Ветка всегда валидна; откат не меняет original.
+    // Розміщує інтервали з жорсткою фіксацією задач, що вже виконуються.
+    // Гілка зберігає допустимість розміщення; відкат не змінює original.
     struct RepackSearch {
         const std::vector<QueueTaskItem>& original;
         const std::vector<uint8_t>& enabled;
@@ -255,8 +255,8 @@ namespace {
                 if (exhaustive && visited >= cfg.max_repack_nodes)return false;
             }
             if (exhaustive && cfg.mode == QueueSearchMode::LiteBrute) {
-                // Дополнительный посекундный перебор с откатом, не создавая
-                // массива всех секунд и не ограничивая его опорными точками.
+                // Додатковий посекундний перебір із відкатом без створення
+                // масиву всіх секунд і без обмеження лише опорними точками.
                 for (int stream = 0; stream<int(enabled.size()); ++stream) {
                     if (!enabled[stream])continue;
                     for (const Gap& gap : free_gaps(placed, stream, -1, t.cooking_time_sec, lo, t.max_deadline_sec)) {
@@ -282,8 +282,8 @@ namespace {
         }
     };
 
-    // Полный перебор с откатом: задача не создаёт отдельной копии расписания в каждом узле.
-    // Новые временные метки возникают при добавлении каждого очередного интервала.
+    // Повний перебір із відкатом: для кожного вузла не створюється окрема копія розкладу.
+    // Нові часові позначки виникають під час додавання чергового інтервалу.
     struct LiteBruteSearch {
         const std::vector<QueueTaskItem>& original;
         const std::vector<uint8_t>& enabled;
@@ -315,7 +315,7 @@ namespace {
                     placed.push_back(src[i]);
                 else order.push_back(i);
             }
-            // Сначала ограниченные по времени задачи: это обрезает дерево раньше.
+            // Спочатку розміщуються задачі з найменшим часовим запасом для раннього відсікання гілок.
             std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
                 const auto& x = original[a]; const auto& y = original[b];
                 const int sx = x.max_deadline_sec - x.min_deadline_sec - x.cooking_time_sec;
@@ -350,7 +350,7 @@ namespace {
         bool dfs(int position, int probe_start, int probe_stream) {
             if (stop) return false;
             if (position == int(order.size())) {
-                // В исходном порядке восстановление требуется только на листьях.
+                // Відновлення початкового порядку потрібне лише в листових вузлах.
                 assembled = original;
                 for (size_t n = 0; n < order.size(); ++n) {
                     const auto& task = placed[placed.size() - order.size() + n];
@@ -383,7 +383,7 @@ namespace {
                     if (stop) break;
                     const int a = std::max(first, g.lo), b = std::min(last, g.hi);
                     if (a > b) continue;
-                    // Метки появляются по мере построения конкретной временной ветви.
+                    // Часові позначки утворюються під час побудови конкретної гілки розкладу.
                     std::vector<int> marks = { task.start_time_sec,a,b,
                         probe_start - task.cooking_time_sec,probe_start + duration };
                     for (const auto& p : placed) {
@@ -396,7 +396,7 @@ namespace {
                         const auto dx = std::abs(int64_t(x) - task.start_time_sec);
                         const auto dy = std::abs(int64_t(y) - task.start_time_sec);
                         if (dx != dy)return dx < dy;
-                        return x > y; // Сначала вправо; после неуспеха ветка идёт влево.
+                        return x > y; // Спочатку праворуч; якщо варіант не підходить, далі ліворуч.
                         });
                     marks.erase(std::unique(marks.begin(), marks.end()), marks.end());
                     auto try_start = [&](int start)->bool {
@@ -408,15 +408,15 @@ namespace {
                         placed.push_back(value);
                         from_task(start, task.cooking_time_sec);
                         const bool done = dfs(position + 1, probe_start, probe_stream);
-                        placed.pop_back();  // Откат только одного назначения.
+                        placed.pop_back();  // Відкат лише одного призначення.
                         return done;
                         };
                     for (int mark : marks) {
                         if (stop)break;
                         if (try_start(mark))return true;
                     }
-                    // Если опорных точек недостаточно, перебираем все секунды диапазона.
-                    // Никаких массивов длиной в сутки не создаётся.
+                    // Якщо опорних точок недостатньо, перебираємо всі секунди діапазону.
+                    // Масиви завдовжки в добу не створюються.
                     if (!stop) {
                         std::unordered_set<int> anchors(marks.begin(), marks.end());
                         const int center = clamp_int(task.start_time_sec, a, b);
@@ -451,8 +451,8 @@ namespace {
                     times.erase(candidate);
                 }
                 else {
-                    // Полное уточнение после исчерпания динамически созданных меток.
-                    // Сначала проверяем секунды справа, затем симметрично слева.
+                    // Повне уточнення після вичерпання динамічно створених часових позначок.
+                    // Спочатку перевіряємо секунди праворуч, потім симетрично ліворуч.
                     while (delta <= std::max(target - lo, hi - target)) {
                         const int candidate = right_next ? target + delta : target - delta;
                         if (!right_next)++delta;
@@ -467,7 +467,7 @@ namespace {
                 if (!visited_times.insert(point).second)continue;
                 for (int stream = 0; stream<int(enabled.size()) && !stop; ++stream) {
                     if (!enabled[stream])continue;
-                    tick(); // Учитываем в бюджете также проверку точки при отсутствии подвижных задач.
+                    tick(); // У бюджеті враховується також перевірка точки, навіть якщо немає рухомих задач.
                     if (stop)break;
                     QueueTaskItem probe{ point,point + duration,duration,point,temp_id,stream };
                     if (!fits(probe))continue;
@@ -480,7 +480,7 @@ namespace {
                     result.left.moved_count == 0 && result.right.moved_count == 0)break;
             }
             result.diagnostics.nodes_expanded = uint32_t(std::min<int64_t>(examined, UINT32_MAX));
-            // Рабочие стеки, массивы и узлы std::set приблизительно по sizeof.
+            // Робочі стеки, масиви та вузли std::set оцінюються приблизно за sizeof.
             const uint64_t bytes = sizeof(*this) + uint64_t(placed.capacity() + assembled.capacity()) * sizeof(QueueTaskItem) +
                 uint64_t(order.capacity()) * sizeof(int) +
                 uint64_t(times.size() + visited_times.size()) * (sizeof(int) + 3 * sizeof(void*) + 32) +
@@ -490,7 +490,7 @@ namespace {
         }
     };
 
-    // Узлы анклавного дерева содержат только родителя и диапазон перемещений в арене.
+    // Вузли анклавного дерева містять лише посилання на батьківський вузол і діапазон переміщень в арені.
     struct EnclaveMove { int index, start, stream; };
     struct EnclaveNode { int parent = -1, begin = 0, count = 0, depth = 0; int64_t priority = 0; };
     struct OccupancyStep { int begin, end, count; };
@@ -656,7 +656,7 @@ namespace {
         void apply_enclaves(int node, const std::vector<QueueTaskItem>& state) {
             const std::vector<uint64_t> changed = mask(state);
             for (const auto& enc : enclaves) {
-                // Маска быстро исключает группы, затрагивающие уже перенесённые задачи.
+                // Маска швидко відсікає групи, які зачіпають уже переміщені задачі.
                 bool intersect = false;
                 for (size_t word = 0; word < changed.size(); ++word)
                     if ((changed[word] & enc.changed_mask[word]) != 0) { intersect = true; break; }
@@ -694,8 +694,8 @@ namespace {
                 if (node > 0 && valid && !enclaves.empty())apply_enclaves(node, state);
                 auto candidate_tasks = relevant(state);
                 if (valid && !stable.empty()) {
-                    // Профиль устойчивого состояния показывает насыщенные интервалы.
-                    // Проверка точной совместимости всё равно происходит по stream_id.
+                    // Профіль стійкого стану показує інтервали з повним завантаженням.
+                    // Точна перевірка сумісності все одно виконується за stream_id.
                     const int available = int(std::count_if(enabled.begin(), enabled.end(),
                         [](uint8_t on) {return on != 0; }));
                     for (const OccupancyStep& step : stable.back().timeline) {
@@ -744,7 +744,7 @@ namespace {
         }
     };
 
-} // namespace (только внутренние детали реализации)
+} // namespace (лише внутрішні деталі реалізації)
 
 bool QueueEngine::valid(const std::vector<QueueTaskItem>& tasks,
     const std::vector<uint8_t>& enabled, bool allow_frozen_existing) {
@@ -769,7 +769,7 @@ EngineInsertResult QueueEngine::insert(const std::vector<QueueTaskItem>& origina
         max_sec > cfg.max_time_sec || max_sec - std::max(min_sec, current_sec) < duration ||
         !valid(original, enabled)) return result;
     min_sec = std::max(min_sec, current_sec);
-    // Устаревшее расписание не должно становиться базой нового плана.
+    // Застарілий розклад не може бути основою нового плану.
     for (const auto& t : original)
         if (!fixed(t) && t.start_time_sec < current_sec) return result;
 
@@ -827,7 +827,7 @@ EngineInsertResult QueueEngine::insert(const std::vector<QueueTaskItem>& origina
                 if (better(local.right, result.right, false)) result.right = std::move(local.right);
                 if (result.left.found && result.right.found &&
                     result.left.start_sec == target && result.right.start_sec == target) {
-                    // Целевое начало является нижней границей ошибки по времени.
+                    // Цільовий початок задає нижню межу часової похибки.
                     if (expanded >= 8) {
                         result.diagnostics.nodes_expanded = expanded;
                         result.diagnostics.peak_bytes = peak_memory + sizeof(frontier);
@@ -843,7 +843,7 @@ EngineInsertResult QueueEngine::insert(const std::vector<QueueTaskItem>& origina
     result.search_limit_hit = !frontier.empty();
     result.diagnostics.budget_exhausted = result.search_limit_hit;
     result.diagnostics.nodes_expanded = expanded;
-    // Ограниченный режим хранит полные состояния в каждой вершине очереди.
+    // Обмежений режим зберігає повні стани в кожній вершині черги.
     result.diagnostics.peak_bytes = peak_memory + sizeof(frontier);
     return result;
 }
@@ -857,10 +857,10 @@ bool QueueEngine::repack(const std::vector<QueueTaskItem>& original,
     for (int i = 0; i < int(original.size()); ++i) {
         const auto& t = original[i];
         const bool pinned = t.task_id == preserved_task_id || fixed(t);
-        // Прошедшую незакреплённую подготовку нельзя переносить задним числом.
+        // Підготовку, що вже почалася та не була закріплена, не можна переносити заднім числом.
         if (!pinned && t.start_time_sec < current_sec) return false;
         if (pinned) {
-            // Другую уже закреплённую задачу запрещено выталкивать с закрытого потока.
+            // Іншу вже закріплену задачу заборонено витісняти із закритого потоку.
             if (t.stream_id == closing_stream_id && t.task_id != preserved_task_id) return false;
             solver.placed.push_back(t);
         }

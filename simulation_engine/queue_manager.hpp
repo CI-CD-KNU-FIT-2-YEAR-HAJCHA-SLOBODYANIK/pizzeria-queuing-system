@@ -7,7 +7,7 @@
 #include <vector>
 #include "utils.hpp"
 
-// единица очереди
+// Елемент черги.
 struct QueueTaskItem {
     int min_deadline_sec = -1;
     int max_deadline_sec = -1;
@@ -17,7 +17,7 @@ struct QueueTaskItem {
     int stream_id = -1;
 };
 
-// данные для фиксации дедлайнов задачам
+// Дані для закріплення часових обмежень задач.
 struct QueueTaskPlacement {
     int task_id = -1;
     int min_deadline_sec = -1;
@@ -34,8 +34,8 @@ struct QueueEvent {
 enum class QueueSearchMode : uint8_t {
     Fast = 0,
     Bounded = 1,
-    LiteBrute = 2,   // DFS по динамическим временным точкам, с возвратом и полным уточнением в секундах
-    EnclaveTree = 3  // Дерево переопределений, устойчивые профили и переиспользуемые анклавы
+    LiteBrute = 2,   // DFS за динамічними часовими точками з поверненням і повним уточненням до секунд.
+    EnclaveTree = 3  // Дерево перевизначень, стійкі профілі та повторно використовувані анклави.
 };
 
 inline bool queue_mode_implemented(QueueSearchMode mode) {
@@ -52,16 +52,16 @@ struct QueueConfig {
     int max_time_sec = SECONDS_PER_DAY;
 };
 
-// Приближённая оценка выделенной памяти: sizeof учитывает выравнивание структур,
-// capacity векторов учитывает их неиспользованную ёмкость. Метаданные аллокатора
-// и память сторонних библиотек не учитываются. Пик поиска — для последнего запуска.
+// Приблизна оцінка виділеної пам'яті: sizeof враховує вирівнювання структур,
+// а capacity векторів — їхню невикористану місткість. Службові дані алокатора
+// та пам'ять сторонніх бібліотек не враховуються. Пік пошуку — для останнього запуску.
 struct QueueMemoryUsage {
     uint64_t current_bytes = 0;
     uint64_t last_search_peak_bytes = 0;
     uint64_t estimated_peak_bytes = 0;
     uint32_t last_search_nodes = 0;
     uint32_t last_search_enclaves = 0;
-    bool search_limit_hit = false; // Не найдено доказательство отсутствия решения.
+    bool search_limit_hit = false; // Відсутність розв'язку не доведена.
     QueueSearchMode mode = QueueSearchMode::Fast;
 };
 
@@ -83,7 +83,7 @@ public:
     const std::vector<QueueTaskItem>* get_variant(int id) const;
     bool compress(int target, int curr_time_clear_sec = 0, bool apply = true);
 
-    // Возвращает КОНЦЫ интервалов и ID связанных буферов (слева/справа от целевого начала).
+    // Повертає КІНЦІ інтервалів та ID пов'язаних буферів (ліворуч/праворуч від цільового початку).
     std::pair<int, int> put_time(int target_sec, int duration_sec, int& left_id, int& right_id,
         int min_sec = 0, int max_sec = SECONDS_PER_DAY, int current_sec = 0);
     std::pair<int, int> put_time_buffered(int queue_id, int target_sec, int duration_sec,
@@ -97,12 +97,12 @@ public:
     bool close_deadlines(int task_id);
     int next_event(int current_sec, QueueEvent& out_event);
 
-    // Лишь по внешнему запросу; не вызывается на каждом шаге планировщика.
+    // Оцінка виконується лише за зовнішнім запитом, а не на кожному кроці планувальника.
     QueueMemoryUsage memory_usage() const;
     bool last_search_limit_hit() const { return last_search_limit_hit_; }
 
-    // Не создаёт зависимости от Logger: шаблон работает с существующим logger.log_issue.
-    // В main позднее: manager.log_memory_usage(logger, time, IssueSeverity::Info);
+    // Шаблон використовує наявний метод logger.log_issue без залежності від Logger.
+    // Приклад виклику: manager.log_memory_usage(logger, time, IssueSeverity::Info);
     template <class LoggerT, class SeverityT>
     void log_memory_usage(LoggerT& logger, int timestamp_sec, SeverityT severity) const {
         const QueueMemoryUsage m = memory_usage();

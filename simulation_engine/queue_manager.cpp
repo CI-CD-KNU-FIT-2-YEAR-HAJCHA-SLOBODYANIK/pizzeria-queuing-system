@@ -99,7 +99,7 @@ bool QueueManager::freeze_stream(int stream_id, int keep_task_id, int curr_time_
     last_search_enclaves_ = diagnostics.enclaves_created;
     last_search_limit_hit_ = diagnostics.budget_exhausted;
     if (!found || !validate_current(output, enabled)) return false;
-    // Выключенный поток не содержит иных задач, кроме сохранённой выполняющейся.
+    // Вимкнений потік не містить інших задач, окрім збереженої задачі, що виконується.
     for (const auto& t : output)
         if (t.stream_id == stream_id && t.task_id != keep_task_id) return false;
     sort_queue(output);
@@ -121,7 +121,7 @@ bool QueueManager::compress(int target, int curr_time_clear_sec, bool apply) {
             if (!enabled[s]) { enabled[s] = 1; ++count; }
     }
     else {
-        // Выводим потоки с конца. Весь compress атомарен, даже при нескольких отключениях.
+        // Вимикаємо потоки з кінця. Операція compress є атомарною навіть за кількох вимкнень.
         for (int s = stream_count() - 1; s >= 0 && count > target; --s) {
             if (!enabled[s]) continue;
             int keep = -1;
@@ -172,12 +172,12 @@ bool QueueManager::shift_stream_left(int stream_id, int seconds, int curr_time_c
     bool changed = false;
     for (int i : indices) {
         auto& task = candidate[i];
-        // Невыполненная подготовка не может стартовать в прошлом.
+        // Підготовка, що ще не почалася, не може стартувати в минулому.
         if (is_locked(task) || task.start_time_sec < curr_time_clear_sec) break;
         const int earliest = std::max({ task.min_deadline_sec, free_from,
             task.start_time_sec - seconds });
         if (earliest > task.start_time_sec) return false;
-        if (earliest == task.start_time_sec) break; // не смещаем последующие
+        if (earliest == task.start_time_sec) break; // Не зміщуємо наступні задачі.
         task.start_time_sec = earliest;
         free_from = earliest + task.cooking_time_sec;
         changed = true;
@@ -192,7 +192,7 @@ bool QueueManager::shift_stream_left(int stream_id, int seconds, int curr_time_c
 
 void QueueManager::drop_variants() {
     std::deque<Variant> empty;
-    queue_variants_.swap(empty); // Освобождаем даже оставшиеся блоки deque.
+    queue_variants_.swap(empty); // Звільняємо також залишкові блоки deque.
 }
 
 const QueueManager::Variant* QueueManager::variant_at(int id) const {
@@ -255,7 +255,7 @@ std::pair<int, int> QueueManager::put_time_buffered(int queue_id, int target_sec
     int duration_sec, int& left_id, int& right_id, int min_sec, int max_sec, int current_sec) {
     if (queue_id < 0) return put_time(target_sec, duration_sec,
         left_id, right_id, min_sec, max_sec, current_sec);
-    // Копируем базу: добавление вариантов может удалить старую запись deque.
+    // Копіюємо базовий варіант: додавання нових варіантів може видалити попередній запис deque.
     const Variant* base = variant_at(queue_id);
     if (!base) { left_id = right_id = -1; return { -1, -1 }; }
     Variant snapshot = *base;
@@ -271,7 +271,7 @@ bool QueueManager::apply_variant_items(int id,
     auto candidate = v->items;
     std::unordered_set<int> ids;
     for (const auto& old : current_queue) {
-        // Только зафиксированные, уже начатые задачи могут оставаться в прошлом.
+        // Лише зафіксовані задачі, які вже почалися, можуть мати час початку в минулому.
         if (!is_locked(old) && old.start_time_sec < current_sec) return false;
         ids.insert(old.task_id);
     }
@@ -289,7 +289,7 @@ bool QueueManager::apply_variant_items(int id,
         it->min_deadline_sec = p.min_deadline_sec;
         it->max_deadline_sec = p.max_deadline_sec;
     }
-    // Убедиться, что каждое старое обязательство осталось и его длительность не изменена.
+    // Перевіряємо, що всі раніше прийняті задачі збережені та їхня тривалість не змінилася.
     for (const auto& old : current_queue) {
         auto it = std::find_if(candidate.begin(), candidate.end(),
             [&](const auto& t) { return t.task_id == old.task_id; });
@@ -298,8 +298,8 @@ bool QueueManager::apply_variant_items(int id,
                 (it->stream_id != old.stream_id || it->start_time_sec != old.start_time_sec)))
             return false;
     }
-    // Старые закреплённые задачи сохраняются точно, новые и ещё не начатые
-    // не имеют права начинаться раньше текущей секунды.
+    // Раніше закріплені задачі зберігають свої параметри, а нові та ще не розпочаті
+    // задачі не можуть починатися раніше поточної секунди.
     for (const auto& task : candidate) {
         if (task.start_time_sec >= current_sec) continue;
         const auto it = std::find_if(current_queue.begin(), current_queue.end(),
@@ -331,7 +331,7 @@ bool QueueManager::apply_variant(int id, int start_sec, int min_dl_sec,
     auto it = std::find_if(variant->items.begin(), variant->items.end(),
         [](const auto& t) { return t.task_id == -1; });
     if (it == variant->items.end() || it->start_time_sec != start_sec) return false;
-    // Старый перегруженный интерфейс не задаёт ID: выделяем следующий свободный.
+    // Попередній перевантажений інтерфейс не задає ID: обираємо наступний вільний.
     int next_id = 0;
     for (const auto& t : current_queue)
         next_id = std::max(next_id, t.task_id + 1);
@@ -383,7 +383,7 @@ QueueMemoryUsage QueueManager::memory_usage() const {
     m.current_bytes = sizeof(*this);
     m.current_bytes += uint64_t(current_queue.capacity()) * sizeof(QueueTaskItem);
     m.current_bytes += uint64_t(stream_accepting_.capacity()) * sizeof(uint8_t);
-    // У deque есть блоки и служебные указатели. Оценка намеренно приближённая.
+    // Deque містить блоки та службові вказівники. Оцінка пам’яті є приблизною.
     m.current_bytes += uint64_t(queue_variants_.size()) *
         (sizeof(Variant) + sizeof(void*) * 3);
     for (const Variant& v : queue_variants_)
